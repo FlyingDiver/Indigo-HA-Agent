@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<PluginConfig>
+	<!-- You can add a SupportURL element inside here if you want a context
+		 sensitive help link on the config UI - otherwise it will just link
+		 to the URL specified in the Info.plist. -->
+	<Field type="textfield" id="serverAddress" defaultvalue="localhost">
+        <Label>Home Assistant Server Address:</Label>
+    </Field>
+  <Field type="textfield" id="serverPort" defaultvalue="8123">
+        <Label>Home Assistant Server Port:</Label>
+    </Field>
+	 <Field type="textfield" id="haToken" defaultvalue="1234abcd">
+        <Label>Home Assistant Long-Lived Access Tokens:</Label>
+    </Field>
+		<Field type="checkbox" id="HADebugInfo">
+			<Label></Label>
+			<Description>Enable debug logging (not recommended)</Description>
+		</Field>
+
+
+</PluginConfig>

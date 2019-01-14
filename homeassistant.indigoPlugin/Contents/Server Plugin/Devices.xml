@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<!-- If your plugin defines device types, you can define them here.
+
+	 Devices must specify their type (via the type attribute):
+
+		relay (ON/OFF/STATUS)
+		dimmer (ON/OFF/DIM/BRIGHTEN/SET BRIGHTNESS/STATUS)
+		speedcontrol (ON/OFF/SET SPEED LEVEL/SET SPEED INDEX/INCREASE/DECREASE/STATUS)
+		sensor (ON/OFF/STATUS)
+		thermostat
+		sprinkler
+		custom
+
+	 The first six inherit states, actions and events from Indigo. You can
+	 also specify your own custom actions and additional states, if needed.
+
+	 The Device examples below specifies the sensor types.
+
+	 Devices must also specify a unique typeID - so, for instance, if you define
+	 2 sensor type devices then your plugin can distinguish between the two by
+	 the typeID.
+-->
+<Devices>
+
+	<Device type="relay" id="HAswitchType">
+		<Name>Home Assistant switch</Name>
+		<ConfigUI>
+			<Field id="address" type="textfield" defaultValue="switch.HAdevice">
+				<Label>HA identity ID:</Label>
+			</Field>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
+				<Label>Enable status request / refresh button:</Label>
+			</Field>
+		</ConfigUI>
+		<States>
+		</States>
+	</Device>
+
+	<Device type="sensor" id="HAsensorType">
+		<Name>Home Assistant sensor</Name>
+		<ConfigUI>
+			<Field id="address" type="textfield" defaultValue="sensor.HAdevice">
+				<Label>HA identity ID:</Label>
+			</Field>
+			<Field id="SupportsOnState" type="checkbox" hidden="true" defaultValue="false">
+				<Label>Show ON/OFF state:</Label>
+			</Field>
+			<Field id="SupportsSensorValue" type="checkbox" hidden="true" defaultValue="true">
+				<Label>Show sensor value state:</Label>
+			</Field>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
+				<Label>Enable status request / refresh button:</Label>
+			</Field>
+		</ConfigUI>
+		<States>
+		</States>
+	</Device>
+
+	<Device type="sensor" id="HAbinarySensorType">
+		<Name>Home Assistant binary sensor</Name>
+		<ConfigUI>
+			<Field id="address" type="textfield" defaultValue="binary_sensor.HAdevice">
+				<Label>HA identity ID:</Label>
+			</Field>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
+				<Label>Enable status request / refresh button:</Label>
+			</Field>
+		</ConfigUI>
+		<States>
+		</States>
+	</Device>
+	
+</Devices>
