@@ -22,10 +22,35 @@
 -->
 <Devices>
 
-	<Device type="relay" id="HAswitchType">
-		<Name>Home Assistant switch</Name>
+	<Device type="custom" id="HAsensor">
+		<Name>Home Assistant sensor</Name>
 		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="switch.HAdevice">
+			<Field id="address" type="textfield" defaultValue="sensor.HAdevice">
+				<Label>HA identity ID:</Label>
+			</Field>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
+				<Label>Enable status request / refresh button:</Label>
+			</Field>
+		</ConfigUI>
+		<States>
+			<State id="sensorValue">
+				<ValueType>String</ValueType>
+				<TriggerLabel>sensorValue</TriggerLabel>
+				<ControlPageLabel>sensorValue</ControlPageLabel>
+			</State>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+		</States>
+		<UiDisplayStateId>sensorValue</UiDisplayStateId>
+	</Device>
+
+	<Device type="dimmer" id="HAdimmerType">
+		<Name>Home Assistant light</Name>
+		<ConfigUI>
+			<Field id="address" type="textfield" defaultValue="light.HAdevice">
 				<Label>HA identity ID:</Label>
 			</Field>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
@@ -36,17 +61,11 @@
 		</States>
 	</Device>
 
-	<Device type="sensor" id="HAsensorType">
-		<Name>Home Assistant sensor</Name>
+	<Device type="relay" id="HAswitchType">
+		<Name>Home Assistant switch</Name>
 		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="sensor.HAdevice">
+			<Field id="address" type="textfield" defaultValue="switch.HAdevice">
 				<Label>HA identity ID:</Label>
-			</Field>
-			<Field id="SupportsOnState" type="checkbox" hidden="true" defaultValue="false">
-				<Label>Show ON/OFF state:</Label>
-			</Field>
-			<Field id="SupportsSensorValue" type="checkbox" hidden="true" defaultValue="true">
-				<Label>Show sensor value state:</Label>
 			</Field>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
 				<Label>Enable status request / refresh button:</Label>
@@ -69,5 +88,5 @@
 		<States>
 		</States>
 	</Device>
-	
+
 </Devices>

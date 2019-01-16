@@ -12,6 +12,9 @@
 	 <Field type="textfield" id="haToken" defaultvalue="1234abcd">
         <Label>Home Assistant Long-Lived Access Tokens:</Label>
     </Field>
+		<Field type="textfield" id="pollingInt" defaultvalue="2">
+         <Label>Home Assistant polling interval in seconds:</Label>
+     </Field>
 		<Field type="checkbox" id="HADebugInfo">
 			<Label></Label>
 			<Description>Enable debug logging (not recommended)</Description>
