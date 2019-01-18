@@ -18,8 +18,8 @@ from requests import get
 
 
 class Plugin(indigo.PluginBase):
-    ########################################
-    # Main Functions
+	########################################
+	# Main Functions
 	########################################
 	def __init__(self, pluginId, pluginDisplayName, pluginVersion, pluginPrefs):
 		indigo.PluginBase.__init__(self, pluginId, pluginDisplayName, pluginVersion, pluginPrefs)
@@ -37,12 +37,12 @@ class Plugin(indigo.PluginBase):
 
 		self.updatePrefs(pluginPrefs)
 
-    # Unload Plugin
+	# Unload Plugin
 	########################################
 	def __del__(self):
 		indigo.PluginBase.__del__(self)
 
-    # Update config values
+	# Update config values
 	########################################
 	def updatePrefs(self, pluginPrefs):
 		self.debug = pluginPrefs.get(u'HADebugInfo', False)
@@ -70,20 +70,43 @@ class Plugin(indigo.PluginBase):
 		indigo.server.log(u"Starting device with address: " + dev.address)
 
 		url = 'http://''%s'':''%s''/api/states/''%s' % (self.SERVER_ADDRESS, self.SERVER_PORT, dev.address)
-		indigo.server.log("Address:%s" % (url))
-
 		r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
 
-		self.logger.info("Indigo setup:%s. Status 200 or 201 connection OK!" % (r))
+		# [int(r) for r in str.split() if r.isdigit()]
+		# indigo.server.log(u"Starting device with address: " + r)
+		#
+		# if r == 200 or r == 201:
+		# 	self.logger.info("HA connection established successfully!")
+		#
+		# else:
+		# 	self.logger.info("HA connection not established! Check your parameter settings and reload plugin")
+		#
+
 
 #		stateListOrDisplayStateIdChanged()
+
+	########################################
+	def validateDeviceConfigUi(self, valuesDict, typeId, devId):
+		return (True, valuesDict)
 
 	########################################
 	def runConcurrentThread(self):
 		try:
 			while True:
-
 				for dev in indigo.devices.iter("self"):
+					store_list = []
+					url = 'http://''%s'':''%s''/api/states' % (self.SERVER_ADDRESS, self.SERVER_PORT)
+					r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
+
+			#		device = r.json()
+			#		for item in device:
+			#			store_detailes = {}
+			#			store_detailes[item["entity_id"]] = item["entity_id"] , item["last_updated"]
+			#			store_list.append(store_detailes)
+			#		self.logger.info("Print HA:\n %s \n" % (store_list[item["entity_id"]])
+
+
+
 					if not dev.enabled or not dev.configured:
 						continue
 
@@ -117,45 +140,21 @@ class Plugin(indigo.PluginBase):
 							ha_device = r.json()
 							self.debugLog("Device content:\n{}".format(ha_device))
 #							self.logger.info("Print content:\n{}".format(ha_device))
-							v = ha_device[u"state"]
-							last_updated = ha_device[u"last_updated"]
 #							self.logger.info("Indigo setup:%s" % (v))
 
-							if last_updated != dev.states['lastUpdated']:
-								dev.updateStateOnServer("sensorValue", value=v)
-								dev.updateStateOnServer("lastUpdated", value=last_updated)
+							if ha_device[u"last_updated"] != dev.states['lastUpdated']:
+								dev.updateStateOnServer("sensorValue", value=ha_device[u"state"])
+								dev.updateStateOnServer("lastUpdated", value=ha_device[u"last_updated"])
 								dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
 						else:
 							dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
-# 					###HA sensor###
-# 					if dev.deviceTypeId == u"HAsensorType":
-# 						if isinstance(dev.sensorValue, numbers.Real):
-# 							if dev.sensorValue is not None:
-#
-# 								url = 'http://''%s'':''%s''/api/states/''%s' % (self.SERVER_ADDRESS, self.SERVER_PORT, dev.address)
-# 								r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
-#
-# 								ha_device = r.json()
-# 								self.debugLog("Device content:\n{}".format(ha_device))
-# #									self.logger.info("Print content:\n{}".format(ha_device))
-# 								v=ha_device[u"state"]
-#
-# #									self.logger.info("Indigo setup:%s" % (v))
-#
-# 								dev.updateStateOnServer("sensorValue", value=v, decimalPlaces=2)
-# 								dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-#
-# 							else:
-# 								dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-# 						else:
-# 							self.logger.info("Error: '%s 'is not a number" % dev.sensorValue)
-# 							return
 
 
-					###HA switch###
-					if dev.deviceTypeId == u"HAswitchType":
+
+					###HA switch and dimmer###
+					if dev.deviceTypeId == u"HAswitchType" or dev.deviceTypeId == u"HAdimmerType":
 						if dev.onState is not None:
 							url = 'http://''%s'':''%s''/api/states/''%s' % (self.SERVER_ADDRESS, self.SERVER_PORT, dev.address)
 							r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
@@ -174,37 +173,23 @@ class Plugin(indigo.PluginBase):
 						else:
 							dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
-					###HA Dimmer###
 					if dev.deviceTypeId == u"HAdimmerType":
-#						self.logger.info("Indigo setup:%s" % (dev))
-
-						if dev.onState is not None:
-							url = 'http://''%s'':''%s''/api/states/''%s' % (self.SERVER_ADDRESS, self.SERVER_PORT, dev.address)
-							r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
-
-							ha_device = r.json()
-							self.debugLog("Device content:\n{}".format(ha_device))
-#							self.logger.info("Print content:\n{}".format(ha_device))
-
-							if ha_device[u"state"] == 'off':
-								dev.updateStateOnServer("onOffState", value=False)
-							else:
-								dev.updateStateOnServer("onOffState", value=True)
-
-							dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-
-						else:
-							dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-
 						if dev.brightness is not None:
 							url = 'http://''%s'':''%s''/api/states/''%s' % (self.SERVER_ADDRESS, self.SERVER_PORT, dev.address)
 							r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
 
 							ha_device = r.json()
-							self.debugLog("Device content:\n{}".format(ha_device))
-#							self.logger.info("Print content:\n{}".format(ha_device))
+							att = ha_device[u"attributes"]
 
-							dev.updateStateOnServer("brightnessLevel", value=dev.brightness)
+							try:
+								bri = att[u"brightness"] / 2.55
+							except KeyError:
+								bri = 0
+
+							self.debugLog("Device content:\n{}".format(ha_device))
+#							self.logger.info("Print content:\n{}".format(bri))
+
+							dev.updateStateOnServer("brightnessLevel", value=int(bri))
 
 							dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
@@ -212,13 +197,13 @@ class Plugin(indigo.PluginBase):
 							dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
 
-				self.sleep(1)
+				self.sleep(3)
 		except self.StopThread:
 			pass	# Optionally catch the StopThread exception and do any needed cleanup.
 
 
 	def actionControlDimmerRelay(self, action, dev):
-
+		sendSuccess = False
 		###HA switch###
 		if dev.deviceTypeId == u"HAswitchType":
 			###### TURN ON ######
@@ -227,16 +212,9 @@ class Plugin(indigo.PluginBase):
 
 				url = 'http://''%s'':''%s''/api/services/switch/turn_on' % (self.SERVER_ADDRESS, self.SERVER_PORT)
 
-#				entity_id = "switch.{}".format(dev.address["ha_name"])
 				post_data = {"entity_id": dev.address}
 
-#				r = requests.post(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'}, data='{"entity_id": "switch.vaskerom_torketrommel"}')
 				r = requests.post(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'}, data=json.dumps(post_data))
-
-#				self.logger.info("Indigo setup:%s" % (json.dumps(post_data)))
-
-#				self.debugLog("Device content url:\n{}".format(url))
-#				self.debugLog("Device content r:\n{}".format(r))
 
 				sendSuccess = True  # Set to False if it failed.
 
@@ -255,16 +233,9 @@ class Plugin(indigo.PluginBase):
 				# Command hardware module (dev) to turn OFF here:
 				url = 'http://''%s'':''%s''/api/services/switch/turn_off' % (self.SERVER_ADDRESS, self.SERVER_PORT)
 
-#				entity_id = "switch.{}".format(dev.address["ha_name"])
 				post_data = {"entity_id": dev.address}
 
-#				r = requests.post(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'}, data='{"entity_id": "switch.vaskerom_torketrommel"}')
 				r = requests.post(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'}, data=json.dumps(post_data))
-
-#				self.logger.info("Indigo setup:%s" % (json.dumps(post_data)))
-
-#				self.debugLog("Device content url:\n{}".format(url))
-#				self.debugLog("Device content r:\n{}".format(r))
 
 				sendSuccess = True		# Set to False if it failed.
 
@@ -278,9 +249,71 @@ class Plugin(indigo.PluginBase):
 					# Else log failure but do NOT update state on Indigo Server.
 					indigo.server.log(u"send \"%s\" %s failed" % (dev.name, "off"), isError=True)
 
+		###HA dimmer###
+		if dev.deviceTypeId == u"HAdimmerType":
+			###### TURN ON ######
+			if action.deviceAction == indigo.kDeviceAction.TurnOn:
+				# Command hardware module (dev) to turn ON here:
 
-#	def closedPrefsConfigUi(self, valuesDict, userCancelled):
-#		if userCancelled is False:
-#			self.updatePrefs(valuesDict)
-#
-#		return (True, valuesDict)
+				url = 'http://''%s'':''%s''/api/services/light/turn_on' % (self.SERVER_ADDRESS, self.SERVER_PORT)
+
+				post_data = {"entity_id": dev.address}
+
+				r = requests.post(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'}, data=json.dumps(post_data))
+
+				sendSuccess = True  # Set to False if it failed.
+
+				if sendSuccess:
+					# If success then log that the command was successfully sent.
+					indigo.server.log(u"sent \"%s\" %s" % (dev.name, "on"))
+
+					# And then tell the Indigo Server to update the state.
+					dev.updateStateOnServer("onOffState", True)
+				else:
+					# Else log failure but do NOT update state on Indigo Server.
+					indigo.server.log(u"send \"%s\" %s failed" % (dev.name, "on"), isError=True)
+
+			###### TURN OFF ######
+			elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
+				# Command hardware module (dev) to turn OFF here:
+				url = 'http://''%s'':''%s''/api/services/light/turn_off' % (self.SERVER_ADDRESS, self.SERVER_PORT)
+
+				post_data = {"entity_id": dev.address}
+
+				r = requests.post(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'}, data=json.dumps(post_data))
+
+				sendSuccess = True		# Set to False if it failed.
+
+				if sendSuccess:
+					# If success then log that the command was successfully sent.
+					indigo.server.log(u"sent \"%s\" %s" % (dev.name, "off"))
+
+					# And then tell the Indigo Server to update the state:
+					dev.updateStateOnServer("onOffState", False)
+				else:
+					# Else log failure but do NOT update state on Indigo Server.
+					indigo.server.log(u"send \"%s\" %s failed" % (dev.name, "off"), isError=True)
+
+			###### SET BRIGHTNESS ######
+			elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness:
+				# Command hardware module (dev) to turn OFF here:
+				url = 'http://''%s'':''%s''/api/services/light/turn_on' % (self.SERVER_ADDRESS, self.SERVER_PORT)
+
+				newBrightness = action.actionValue
+				post_data = {"entity_id": dev.address, "brightness_pct": newBrightness}
+				data = data=json.dumps(post_data)
+
+				indigo.server.log(u"JSON data:" + data)
+				r = requests.post(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'}, data=data)
+
+				sendSuccess = True		# Set to False if it failed.
+
+				if sendSuccess:
+					# If success then log that the command was successfully sent.
+					indigo.server.log(u"sent \"%s\" %s" % (dev.name, newBrightness))
+
+					# And then tell the Indigo Server to update the state:
+					dev.updateStateOnServer("brightnessLevel", newBrightness)
+				else:
+					# Else log failure but do NOT update state on Indigo Server.
+					indigo.server.log(u"send \"%s\" %s failed" % (dev.name, dev.brightness), isError=True)
