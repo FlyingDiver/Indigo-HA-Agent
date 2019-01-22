@@ -49,12 +49,12 @@ class Plugin(indigo.PluginBase):
 		self.SERVER_ADDRESS = pluginPrefs.get(u'serverAddress', u'localhost')
 		self.SERVER_PORT = (pluginPrefs.get(u'serverPort', u'8123'))
 		self.TOKEN = pluginPrefs.get(u'haToken', u'1234abcd')
-		self.POLLINGINT = pluginPrefs.get(u'pollingInt', u'2')
+		self.POLLINGINT = float(pluginPrefs.get("pollingInt", 3))
 
 		if self.debug == True:
 			indigo.server.log("Home Assistant debugging enabled.")
 		else:
-			indigo.server.log("Home Assistant disabled.")
+			indigo.server.log("Home Assistant debugging disabled.")
 
 ########################################
 	def startup(self):
@@ -69,8 +69,8 @@ class Plugin(indigo.PluginBase):
 #		self.debugLog(u"Starting device: " + dev.name)
 		indigo.server.log(u"Starting device with address: " + dev.address)
 
-		url = 'http://''%s'':''%s''/api/states/''%s' % (self.SERVER_ADDRESS, self.SERVER_PORT, dev.address)
-		r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
+#		url = 'http://''%s'':''%s''/api/states/''%s' % (self.SERVER_ADDRESS, self.SERVER_PORT, dev.address)
+#		r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
 
 		# [int(r) for r in str.split() if r.isdigit()]
 		# indigo.server.log(u"Starting device with address: " + r)
@@ -82,6 +82,12 @@ class Plugin(indigo.PluginBase):
 		# 	self.logger.info("HA connection not established! Check your parameter settings and reload plugin")
 		#
 
+	def closedPrefsConfigUi(self, valuesDict, userCancelled):
+		# Since the dialog closed we want to set the debug flag - if you don't directly use
+		# a plugin's properties (and for debugLog we don't) you'll want to translate it to
+		# the appropriate stuff here.
+		if not userCancelled:
+			self.updatePrefs(valuesDict)
 
 #		stateListOrDisplayStateIdChanged()
 
@@ -94,19 +100,8 @@ class Plugin(indigo.PluginBase):
 		try:
 			while True:
 				for dev in indigo.devices.iter("self"):
-					store_list = []
-					url = 'http://''%s'':''%s''/api/states' % (self.SERVER_ADDRESS, self.SERVER_PORT)
-					r = requests.get(url, headers={'Authorization': 'Bearer ''%s' % self.TOKEN, 'content-type': 'application/json'})
-
-			#		device = r.json()
-			#		for item in device:
-			#			store_detailes = {}
-			#			store_detailes[item["entity_id"]] = item["entity_id"] , item["last_updated"]
-			#			store_list.append(store_detailes)
-			#		self.logger.info("Print HA:\n %s \n" % (store_list[item["entity_id"]])
-
-
-
+#					self.logger.info("Print content:\n{}".format(websoc.message))
+#					self.logger.info("Print content:\n{}".format(ha_device))
 					if not dev.enabled or not dev.configured:
 						continue
 
@@ -149,8 +144,6 @@ class Plugin(indigo.PluginBase):
 
 						else:
 							dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-
-
 
 
 					###HA switch and dimmer###
@@ -197,7 +190,7 @@ class Plugin(indigo.PluginBase):
 							dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
 
-				self.sleep(3)
+				self.sleep(self.POLLINGINT)
 		except self.StopThread:
 			pass	# Optionally catch the StopThread exception and do any needed cleanup.
 
