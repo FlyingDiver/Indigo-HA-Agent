@@ -22,6 +22,109 @@
 -->
 <Devices>
 
+	<Device type="thermostat" id="HAclimate">
+		<Name>Home Assistant climate</Name>
+		<ConfigUI>
+			<Field id="address" type="textfield" defaultValue="climate.HAdevice">
+				<Label>HA identity ID:</Label>
+			</Field>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
+				<Label>Enable status request / refresh button:</Label>
+			</Field>
+			<!-- By default thermostat type devices automatically inherit these
+			device properties which describe the characteristics of a specific
+			thermostat instance:
+
+				NumTemperatureInputs:			should range between 1 and 3
+				NumHumidityInputs:				should range between 0 and 3
+				SupportsHeatSetpoint:			True or False
+				SupportsCoolSetpoint:			True or False
+				SupportsHvacOperationMode:		True or False
+				SupportsHvacFanMode:			True or False
+				ShowCoolHeatEquipmentStateUI:	True or False
+
+			Plugins can update these properties either in device ConfigUI
+			(like below), or can update them from python by using the
+			dev.replacePluginPropsOnServer() method, most likely inside your
+			deviceStartComm method. Both will trigger the Indigo Server to
+			automatically rebuild the device's states list based on the needed
+			changes. Since most entry-level thermostats have 1 temp sensor and
+			0 humidity sensors, those are the default values. If your
+			thermostat supports those, you don't need to change anything.
+			-->
+			<Field type="separator" id="simpleSeparator1" />
+			<Field type="menu" id="NumTemperatureInputs" defaultValue="1">
+				<Label>Number of temperature sensors:</Label>
+				<List>
+					<Option value="0">None</Option>
+					<Option value="1">1</Option>
+				</List>
+			</Field>
+			<Field type="menu" id="NumHumidityInputs" defaultValue="1">
+				<Label>Number of humidity sensors:</Label>
+				<List>
+					<Option value="0">None</Option>
+					<Option value="1">1</Option>
+				</List>
+			</Field>
+			<Field type="checkbox" id="SupportsHeatSetpoint" defaultValue="true">
+				<Label>Supports heat setpoint:</Label>
+				<Description>Show heat setpoint controls in UI</Description>
+			</Field>
+			<Field type="checkbox" id="SupportsCoolSetpoint" defaultValue="false">
+				<Label>Supports cool setpoint(NOT SUPPORTED):</Label>
+				<Description>Show cool setpoint controls in UI</Description>
+			</Field>
+			<Field type="checkbox" id="SupportsHvacOperationMode" defaultValue="true">
+				<Label>Supports thermostat modes(ONLY HEAT SUPPORTED):</Label>
+				<Description>Show thermostat mode controls (heat/cool/auto) in UI</Description>
+			</Field>
+			<Field type="checkbox" id="SupportsHvacFanMode" defaultValue="false">
+				<Label>Supports fan modes(NOT SUPPORTED):</Label>
+				<Description>Show fan mode controls (auto/always on) in UI</Description>
+			</Field>
+			<Field type="checkbox" id="ShowCoolHeatEquipmentStateUI" defaultValue="true">
+				<Label>Supports compressor/furnace feedback:</Label>
+				<Description>Show compressor/furnace states in UI</Description>
+			</Field>
+		</ConfigUI>
+		<States>
+			<!-- By default thermostat type devices automatically inherit these
+			read-only states:
+
+				temperatureInputsAll, humidityInputsAll,
+				hvacOperationModeIsOff, hvacOperationModeIsHeat, hvacOperationModeIsCool,
+				hvacOperationModeIsAuto, hvacOperationModeIsProgramHeat, hvacOperationModeIsProgramCool,
+				hvacOperationModeIsProgramAuto,
+				hvacFanModeIsAuto, hvacFanModeIsAlwaysOn.
+
+			Additionally, the following writable states are inherited:
+
+				temperatureInput1, temperatureInput2, temperatureInput3,
+				humidityInput1, humidityInput2, humidityInput3,
+				setpointHeat, setpointCool,
+				hvacOperationMode, hvacFanMode,
+				hvacCoolerIsOn, hvacHeaterIsOn, hvacFanIsOn
+			-->
+			<State id="current_temperature">
+				<ValueType>String</ValueType>
+				<TriggerLabel>current_temperature</TriggerLabel>
+				<ControlPageLabel>current_temperature</ControlPageLabel>
+			</State>
+			<State id="sensorValue">
+				<ValueType>String</ValueType>
+				<TriggerLabel>sensorValue</TriggerLabel>
+				<ControlPageLabel>sensorValue</ControlPageLabel>
+			</State>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+		</States>
+	</Device>
+
+
 	<Device type="custom" id="HAsensor">
 		<Name>Home Assistant sensor</Name>
 		<ConfigUI>
