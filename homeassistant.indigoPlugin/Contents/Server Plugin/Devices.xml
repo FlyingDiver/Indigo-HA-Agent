@@ -1,27 +1,5 @@
 <?xml version="1.0"?>
-<!-- If your plugin defines device types, you can define them here.
-
-	 Devices must specify their type (via the type attribute):
-
-		relay (ON/OFF/STATUS)
-		dimmer (ON/OFF/DIM/BRIGHTEN/SET BRIGHTNESS/STATUS)
-		speedcontrol (ON/OFF/SET SPEED LEVEL/SET SPEED INDEX/INCREASE/DECREASE/STATUS)
-		sensor (ON/OFF/STATUS)
-		thermostat
-		sprinkler
-		custom
-
-	 The first six inherit states, actions and events from Indigo. You can
-	 also specify your own custom actions and additional states, if needed.
-
-	 The Device examples below specifies the sensor types.
-
-	 Devices must also specify a unique typeID - so, for instance, if you define
-	 2 sensor type devices then your plugin can distinguish between the two by
-	 the typeID.
--->
 <Devices>
-
 	<Device type="thermostat" id="HAclimate">
 		<Name>Home Assistant climate</Name>
 		<ConfigUI>
@@ -31,27 +9,6 @@
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
 				<Label>Enable status request / refresh button:</Label>
 			</Field>
-			<!-- By default thermostat type devices automatically inherit these
-			device properties which describe the characteristics of a specific
-			thermostat instance:
-
-				NumTemperatureInputs:			should range between 1 and 3
-				NumHumidityInputs:				should range between 0 and 3
-				SupportsHeatSetpoint:			True or False
-				SupportsCoolSetpoint:			True or False
-				SupportsHvacOperationMode:		True or False
-				SupportsHvacFanMode:			True or False
-				ShowCoolHeatEquipmentStateUI:	True or False
-
-			Plugins can update these properties either in device ConfigUI
-			(like below), or can update them from python by using the
-			dev.replacePluginPropsOnServer() method, most likely inside your
-			deviceStartComm method. Both will trigger the Indigo Server to
-			automatically rebuild the device's states list based on the needed
-			changes. Since most entry-level thermostats have 1 temp sensor and
-			0 humidity sensors, those are the default values. If your
-			thermostat supports those, you don't need to change anything.
-			-->
 			<Field type="separator" id="simpleSeparator1" />
 			<Field type="menu" id="NumTemperatureInputs" defaultValue="1">
 				<Label>Number of temperature sensors:</Label>
@@ -89,23 +46,6 @@
 			</Field>
 		</ConfigUI>
 		<States>
-			<!-- By default thermostat type devices automatically inherit these
-			read-only states:
-
-				temperatureInputsAll, humidityInputsAll,
-				hvacOperationModeIsOff, hvacOperationModeIsHeat, hvacOperationModeIsCool,
-				hvacOperationModeIsAuto, hvacOperationModeIsProgramHeat, hvacOperationModeIsProgramCool,
-				hvacOperationModeIsProgramAuto,
-				hvacFanModeIsAuto, hvacFanModeIsAlwaysOn.
-
-			Additionally, the following writable states are inherited:
-
-				temperatureInput1, temperatureInput2, temperatureInput3,
-				humidityInput1, humidityInput2, humidityInput3,
-				setpointHeat, setpointCool,
-				hvacOperationMode, hvacFanMode,
-				hvacCoolerIsOn, hvacHeaterIsOn, hvacFanIsOn
-			-->
 			<State id="current_temperature">
 				<ValueType>String</ValueType>
 				<TriggerLabel>current_temperature</TriggerLabel>
@@ -123,7 +63,6 @@
 			</State>
 		</States>
 	</Device>
-
 
 	<Device type="custom" id="HAsensor">
 		<Name>Home Assistant sensor</Name>
@@ -191,5 +130,4 @@
 		<States>
 		</States>
 	</Device>
-
 </Devices>
