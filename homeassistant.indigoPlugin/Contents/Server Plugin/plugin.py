@@ -90,8 +90,11 @@ class Plugin(indigo.PluginBase):
                     url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/states/{dev.address}"   # noqa
                     ha_device = requests.get(url, headers=headers).json()
                     self.logger.threaddebug(f"Device content:\n{ha_device}")
-                    att = ha_device["attributes"]
-
+                    att = ha_device.get("attributes", None)
+                    if not att:
+                        self.logger.error(f"Device {dev.name} no attributes returned")
+                        continue
+                        
                     if dev.deviceTypeId == "HAclimate":
                         if dev.states["sensorValue"] is not None:
 
@@ -156,6 +159,9 @@ class Plugin(indigo.PluginBase):
         except self.StopThread:
             pass
 
+    ########################################
+    # Relay/Dimmer Action methods
+    ########################################
     def actionControlDimmerRelay(self, action, dev):
         headers = {'Authorization': f'Bearer {self.TOKEN}', 'content-type': 'application/json'}
         sendSuccess = False
@@ -206,9 +212,8 @@ class Plugin(indigo.PluginBase):
                 dev.updateStateOnServer("onOffState", True)
 
     ########################################
-    # Thermostat Action callback
-    ######################
-    # Main thermostat action bottleneck called by Indigo Server.
+    # Thermostat Action methods
+    ########################################
     def actionControlThermostat(self, action, dev):
         headers = {'Authorization': f'Bearer {self.TOKEN}', 'content-type': 'application/json'}
         if action.thermostatAction == indigo.kThermostatAction.SetHvacMode:
@@ -268,7 +273,7 @@ class Plugin(indigo.PluginBase):
         headers = {'Authorization': f'Bearer {self.TOKEN}', 'content-type': 'application/json'}
 
         url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/states/{dev.address}"   # noqa
-        ha_device = requests.get(url, headers=headers).json
+        ha_device = requests.get(url, headers=headers).json()
         self.logger.debug(f"Device content:\n{ha_device}")
         att = ha_device["attributes"]
         SetpointMaxHA = att["max_temp"]
