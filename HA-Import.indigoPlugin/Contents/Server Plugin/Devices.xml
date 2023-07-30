@@ -3,11 +3,9 @@
 	<Device type="thermostat" id="HAclimate">
 		<Name>Home Assistant climate</Name>
 		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="climate.HAdevice">
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false" />
+			<Field id="address" type="textfield" defaultValue="climate.">
 				<Label>HA identity ID:</Label>
-			</Field>
-			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
-				<Label>Enable status request / refresh button:</Label>
 			</Field>
 			<Field type="separator" id="simpleSeparator1" />
 			<Field type="menu" id="NumTemperatureInputs" defaultValue="1">
@@ -46,53 +44,18 @@
 			</Field>
 		</ConfigUI>
 		<States>
-			<State id="current_temperature">
-				<ValueType>String</ValueType>
-				<TriggerLabel>current_temperature</TriggerLabel>
-				<ControlPageLabel>current_temperature</ControlPageLabel>
-			</State>
-			<State id="sensorValue">
-				<ValueType>String</ValueType>
-				<TriggerLabel>sensorValue</TriggerLabel>
-				<ControlPageLabel>sensorValue</ControlPageLabel>
-			</State>
 			<State id="lastUpdated">
 				<ValueType>String</ValueType>
 				<TriggerLabel>lastUpdated</TriggerLabel>
 				<ControlPageLabel>lastUpdated</ControlPageLabel>
 			</State>
 		</States>
-	</Device>
-
-	<Device type="custom" id="HAsensor">
-		<Name>Home Assistant sensor</Name>
-		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="sensor.HAdevice">
-				<Label>HA identity ID:</Label>
-			</Field>
-			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
-				<Label>Enable status request / refresh button:</Label>
-			</Field>
-		</ConfigUI>
-		<States>
-			<State id="sensorValue">
-				<ValueType>String</ValueType>
-				<TriggerLabel>sensorValue</TriggerLabel>
-				<ControlPageLabel>sensorValue</ControlPageLabel>
-			</State>
-			<State id="lastUpdated">
-				<ValueType>String</ValueType>
-				<TriggerLabel>lastUpdated</TriggerLabel>
-				<ControlPageLabel>lastUpdated</ControlPageLabel>
-			</State>
-		</States>
-		<UiDisplayStateId>sensorValue</UiDisplayStateId>
 	</Device>
 
 	<Device type="dimmer" id="HAdimmerType">
 		<Name>Home Assistant light</Name>
 		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="light.HAdevice">
+			<Field id="address" type="textfield" defaultValue="light.">
 				<Label>HA identity ID:</Label>
 			</Field>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
@@ -100,13 +63,18 @@
 			</Field>
 		</ConfigUI>
 		<States>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
 		</States>
 	</Device>
 
 	<Device type="relay" id="HAswitchType">
 		<Name>Home Assistant switch</Name>
 		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="switch.HAdevice">
+			<Field id="address" type="textfield" defaultValue="switch.">
 				<Label>HA identity ID:</Label>
 			</Field>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
@@ -114,20 +82,48 @@
 			</Field>
 		</ConfigUI>
 		<States>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
 		</States>
 	</Device>
 
 	<Device type="sensor" id="HAbinarySensorType">
 		<Name>Home Assistant binary sensor</Name>
 		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="binary_sensor.HAdevice">
+			<Field id="SupportsOnState" type="checkbox" defaultValue="true" hidden="true" />
+			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
+			<Field id="address" type="textfield" defaultValue="binary_sensor.">
 				<Label>HA identity ID:</Label>
-			</Field>
-			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
-				<Label>Enable status request / refresh button:</Label>
 			</Field>
 		</ConfigUI>
 		<States>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
 		</States>
 	</Device>
+
+	<Device type="sensor" id="HAsensor">
+		<Name>Home Assistant sensor</Name>
+		<ConfigUI>
+			<Field id="SupportsSensorValue" type="checkbox" defaultValue="true" hidden="true" />
+			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
+			<Field id="address" type="textfield" defaultValue="sensor.">
+				<Label>HA identity ID:</Label>
+			</Field>
+		</ConfigUI>
+		<States>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+		</States>
+	</Device>
+
 </Devices>

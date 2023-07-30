@@ -16,16 +16,28 @@ kHvacModeEnumToStrMap = {
     indigo.kHvacMode.ProgramHeatCool: "program auto"
 }
 
+kHvacModeStrToEnumMap = {
+    'heat': indigo.kHvacMode.Heat,
+    'cool': indigo.kHvacMode.Cool,
+    'auto': indigo.kHvacMode.HeatCool,
+    'off': indigo.kHvacMode.Off
+}
+
 kFanModeEnumToStrMap = {
     indigo.kFanMode.AlwaysOn: "always on",
     indigo.kFanMode.Auto: "auto"
 }
 
+kFanModeStrToEnumMap = {
+    'auto': indigo.kFanMode.Auto,
+    'on': indigo.kFanMode.AlwaysOn
+}
+
 def _lookupActionStrFromHvacMode(hvacMode):
-    return kHvacModeEnumToStrMap.get(hvacMode, u"unknown")
+    return kHvacModeEnumToStrMap.get(hvacMode, "unknown")
 
 def _lookupActionStrFromFanMode(fanMode):
-    return kFanModeEnumToStrMap.get(fanMode, u"unknown")
+    return kFanModeEnumToStrMap.get(fanMode, "unknown")
 
 ################################################################################
 
@@ -42,19 +54,19 @@ class Plugin(indigo.PluginBase):
         self.indigo_log_handler.setLevel(self.logLevel)
         self.logger.debug(f"logLevel = {self.logLevel}")
 
-        self.SERVER_ADDRESS = 'localhost'
-        self.SERVER_PORT = '8123'
-        self.TOKEN = '1234abcd'
-        self.POLLINGINT = '2'
+        self.server_address = 'localhost'
+        self.server_port = '8123'
+        self.ha_token = ''
+        self.poll_interval = '2'
         self.updatePrefs(pluginPrefs)
 
     # Update config values
     ########################################
     def updatePrefs(self, pluginPrefs):
-        self.SERVER_ADDRESS = pluginPrefs.get('serverAddress', 'localhost')
-        self.SERVER_PORT = (pluginPrefs.get('serverPort', '8123'))
-        self.TOKEN = pluginPrefs.get('haToken', '1234abcd')
-        self.POLLINGINT = float(pluginPrefs.get("pollingInt", 3))
+        self.server_address = pluginPrefs.get('serverAddress', 'localhost')
+        self.server_port = (pluginPrefs.get('serverPort', '8123'))
+        self.ha_token = pluginPrefs.get('haToken', '')
+        self.poll_interval = float(pluginPrefs.get("pollingInt", 3))
         self.logLevel = int(pluginPrefs.get("logLevel", logging.INFO))
         self.indigo_log_handler.setLevel(self.logLevel)
         self.logger.debug(f"logLevel = {self.logLevel}")
@@ -69,8 +81,9 @@ class Plugin(indigo.PluginBase):
 
     ########################################
 
-    def deviceStartComm(self, dev):
-        self.logger.info(f"Starting device with address: {dev.address}")
+    def deviceStartComm(self, device):
+        self.logger.info(f"{device.name}: Starting device with address: {device.address}")
+        device.stateListOrDisplayStateIdChanged()
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
@@ -79,82 +92,75 @@ class Plugin(indigo.PluginBase):
     ########################################
     def runConcurrentThread(self):
 
-        headers = {'Authorization': f'Bearer {self.TOKEN}', 'content-type': 'application/json'}
+        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
         try:
             while True:
-                for dev in indigo.devices.iter("self"):
+                for device in indigo.devices.iter("self"):
 
-                    if not dev.enabled or not dev.configured:
+                    if not device.enabled or not device.configured:
                         continue
 
-                    url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/states/{dev.address}"   # noqa
+                    url = f"http://{self.server_address}:{self.server_port}/api/states/{device.address}"   # noqa
                     ha_device = requests.get(url, headers=headers).json()
-                    self.logger.threaddebug(f"Device content:\n{ha_device}")
                     att = ha_device.get("attributes", None)
                     if not att:
-                        self.logger.error(f"Device {dev.name} no attributes returned")
+                        self.logger.error(f"Device {device.name} no attributes returned")
                         continue
                         
-                    if dev.deviceTypeId == "HAclimate":
-                        if dev.states["sensorValue"] is not None:
+                    if device.deviceTypeId == "HAclimate":
 
-                            if ha_device["last_updated"] != dev.states['lastUpdated']:
-                                dev.updateStateOnServer("setpointHeat", value=att["temperature"])
-                                dev.updateStateOnServer("sensorValue", value=ha_device["state"])
-                                dev.updateStateOnServer("temperatureInput1", value=att["current_temperature"])
-                                dev.updateStateOnServer("current_temperature", value=att["current_temperature"])
-                                dev.updateStateOnServer("lastUpdated", value=ha_device["last_updated"])
+                        if ha_device["last_updated"] != device.states['lastUpdated']:
+                            self.logger.threaddebug(f"{device.name} content:\n{ha_device}")
+                            update_list = [
+                                {'key': "setpointHeat", 'value': att["temperature"]},
+                                {'key': "hvacOperationMode", 'value': kHvacModeStrToEnumMap[ha_device["state"]]},
+                                {'key': "temperatureInput1", 'value': att["current_temperature"]},
+                                {'key': "lastUpdated", 'value': ha_device["last_updated"]},
+                            ]
+                            device.updateStatesOnServer(update_list)
+                            device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
-                                if ha_device["state"] == 'heat':
-                                    dev.updateStateOnServer("hvacHeaterIsOn", value=True)
-                                else:
-                                    dev.updateStateOnServer("hvacHeaterIsOn", value=False)
-
-                                if att["operation_mode"] == 'heat':
-                                    dev.updateStateOnServer("hvacOperationMode", value=1)
-                                else:
-                                    dev.updateStateOnServer("hvacOperationMode", value=0)
-
-                                dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-                        else:
-                            dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-
-                    if dev.deviceTypeId == "HAbinarySensorType":
-                        if dev.onState:
+                    elif device.deviceTypeId == "HAbinarySensorType":
+                        if ha_device["last_updated"] != device.states['lastUpdated']:
+                            self.logger.threaddebug(f"{device.name} content:\n{ha_device}")
                             if ha_device["state"] == 'off':
-                                dev.updateStateOnServer("onOffState", value=False)
+                                device.updateStateOnServer("onOffState", value=False)
                             else:
-                                dev.updateStateOnServer("onOffState", value=True)
-                        dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
+                                device.updateStateOnServer("onOffState", value=True)
+                            device.updateStateOnServer("lastUpdated", value=ha_device["last_updated"])
+                            device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
-                    if dev.deviceTypeId == "HAsensor":
-                        if dev.states[u"sensorValue"] is not None:
-                            if ha_device[u"last_updated"] != dev.states['lastUpdated']:
-                                dev.updateStateOnServer("sensorValue", value=ha_device[u"state"])
-                                dev.updateStateOnServer("lastUpdated", value=ha_device[u"last_updated"])
-                        dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
+                    elif device.deviceTypeId == "HAsensor":
+                        if ha_device["last_updated"] != device.states['lastUpdated']:
+                            self.logger.threaddebug(f"{device.name} content:\n{ha_device}")
+                            device.updateStateOnServer("sensorValue", value=ha_device["state"])
+                            device.updateStateOnServer("lastUpdated", value=ha_device["last_updated"])
+                            device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
-                    if dev.deviceTypeId == "HAswitchType" or dev.deviceTypeId == "HAdimmerType":
-                        if dev.onState is not None:
-
-                            if ha_device[u"state"] == 'off':
-                                dev.updateStateOnServer("onOffState", value=False)
+                    elif device.deviceTypeId == "HAswitchType":
+                        if ha_device["last_updated"] != device.states['lastUpdated']:
+                            self.logger.threaddebug(f"{device.name} content:\n{ha_device}")
+                            if ha_device["state"] == 'off':
+                                device.updateStateOnServer("onOffState", value=False)
                             else:
-                                dev.updateStateOnServer("onOffState", value=True)
+                                device.updateStateOnServer("onOffState", value=True)
+                            device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
-                        dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
+                    elif device.deviceTypeId == "HAdimmerType":
+                        if ha_device["last_updated"] != device.states['lastUpdated']:
+                            self.logger.threaddebug(f"{device.name} content:\n{ha_device}")
+                            if ha_device["state"] == 'off':
+                                device.updateStateOnServer("onOffState", value=False)
+                            else:
+                                device.updateStateOnServer("onOffState", value=True)
+                                brightness = att.get("brightness", 0) / 2.55
+                                device.updateStateOnServer("brightnessLevel", value=round(brightness))
+                            device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
-                    if dev.deviceTypeId == "HAdimmerType":
-                        if dev.brightness is not None:
-                            try:
-                                bri = att["brightness"] / 2.55
-                            except KeyError:
-                                bri = 0
+                    else:
+                        self.logger.error(f"{device.name}: Unknown device type: {device.deviceTypeId}")
 
-                            dev.updateStateOnServer("brightnessLevel", value=int(bri))
-                        dev.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-
-                self.sleep(self.POLLINGINT)
+                self.sleep(self.poll_interval)
 
         except self.StopThread:
             pass
@@ -163,59 +169,39 @@ class Plugin(indigo.PluginBase):
     # Relay/Dimmer Action methods
     ########################################
     def actionControlDimmerRelay(self, action, dev):
-        headers = {'Authorization': f'Bearer {self.TOKEN}', 'content-type': 'application/json'}
-        sendSuccess = False
+        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
+        post_data = {"entity_id": dev.address}
+        self.logger.debug(f"{dev.name}: sending {action.deviceAction} to {dev.address}")
+
         if dev.deviceTypeId == "HAswitchType":
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/services/switch/turn_on"    # noqa
-                post_data = {"entity_id": dev.address}
+                url = f"http://{self.server_address}:{self.server_port}/api/services/switch/turn_on"    # noqa
                 r = requests.post(url, headers=headers,json=post_data)
-
-                self.logger.debug(f"sent \"{dev.name}\" on")
-                dev.updateStateOnServer("onOffState", True)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/services/switch/turn_off"   # noqa
-                post_data = {"entity_id": dev.address}
+                url = f"http://{self.server_address}:{self.server_port}/api/services/switch/turn_off"   # noqa
                 r = requests.post(url, headers=headers,json=post_data)
-
-                self.logger.debug(f"sent \"{dev.name}\" off")
-                dev.updateStateOnServer("onOffState", True)
 
         if dev.deviceTypeId == "HAdimmerType":
-
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/services/light/turn_on" # noqa
-                post_data = {"entity_id": dev.address}
+                url = f"http://{self.server_address}:{self.server_port}/api/services/light/turn_on" # noqa
                 r = requests.post(url, headers=headers,json=post_data)
-
-                self.logger.debug(f"sent \"{dev.name}\" on")
-                dev.updateStateOnServer("onOffState", True)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-
-                url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/services/light/turn_off"    # noqa
-                post_data = {"entity_id": dev.address}
+                url = f"http://{self.server_address}:{self.server_port}/api/services/light/turn_off"    # noqa
                 r = requests.post(url, headers=headers,json=post_data)
-
-                self.logger.debug(f"sent \"{dev.name}\" off")
-                dev.updateStateOnServer("onOffState", True)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness:
 
-                url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/services/light/turn_on"   # noqa
-                newBrightness = action.actionValue
-                post_data = {"entity_id": dev.address, "brightness_pct": newBrightness}
+                url = f"http://{self.server_address}:{self.server_port}/api/services/light/turn_on"   # noqa
+                post_data = {"entity_id": dev.address, "brightness_pct": action.actionValue}
                 r = requests.post(url, headers=headers,json=post_data)
-
-                self.logger.debug(f"sent \"{dev.name}\" set brightness to {newBrightness}")
-                dev.updateStateOnServer("onOffState", True)
 
     ########################################
     # Thermostat Action methods
     ########################################
     def actionControlThermostat(self, action, dev):
-        headers = {'Authorization': f'Bearer {self.TOKEN}', 'content-type': 'application/json'}
+        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
         if action.thermostatAction == indigo.kThermostatAction.SetHvacMode:
             self._handleChangeHvacModeAction(dev, action.actionMode)
 
@@ -249,7 +235,7 @@ class Plugin(indigo.PluginBase):
     ######################
     # Process action request from Indigo Server to change main thermostat's main mode.
     def _handleChangeHvacModeAction(self, dev, newHvacMode):
-        headers = {'Authorization': f'Bearer {self.TOKEN}', 'content-type': 'application/json'}
+        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
 
         if newHvacMode == 0:
             newHvacModeHA = 'off'
@@ -257,7 +243,7 @@ class Plugin(indigo.PluginBase):
             newHvacModeHA = 'heat'
         self.logger.info(f"newHVACmode: {newHvacModeHA}")
 
-        url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/services/climate/set_operation_mode"    # noqa
+        url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_operation_mode"    # noqa
         newHvacModeHA = action.actionValue
         post_data = {"entity_id": dev.address, "operation_mode": newHvacModeHA}
         r = requests.post(url, headers=headers, json=post_data)
@@ -270,9 +256,9 @@ class Plugin(indigo.PluginBase):
     ######################
     # Process action request from Indigo Server to change a cool/heat setpoint.
     def _handleChangeSetpointAction(self, dev, newSetpoint, logActionName, stateKey):
-        headers = {'Authorization': f'Bearer {self.TOKEN}', 'content-type': 'application/json'}
+        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
 
-        url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/states/{dev.address}"   # noqa
+        url = f"http://{self.server_address}:{self.server_port}/api/states/{dev.address}"   # noqa
         ha_device = requests.get(url, headers=headers).json()
         self.logger.debug(f"Device content:\n{ha_device}")
         att = ha_device["attributes"]
@@ -285,7 +271,7 @@ class Plugin(indigo.PluginBase):
             newSetpoint = SetpointMaxHA  # Arbitrary -- set to whatever hardware maximum setpoint value is.
 
         if stateKey in ["setpointCool", "setpointHeat"]:
-            url = f"http://{self.SERVER_ADDRESS}:{self.SERVER_PORT}/api/services/climate/set_temperature"   # noqa
+            url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_temperature"   # noqa
             newHvacModeHA = action.actionValue
             post_data = {"entity_id": dev.address, "temperature": newSetpoint}
             r = requests.post(url, headers=headers, json=post_data)

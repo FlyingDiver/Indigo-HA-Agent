@@ -5,7 +5,12 @@ native Home Assistant devices into Indigo.  This plugin does not require any add
 
 You need the IP address and PORT for your Home Assistant server, and an HA access token.
 
-After that you can add sensor, light and relays, only pass your HA identity(ex: sensor.my_test) to 
-the address field of your chosen device.
-
+The plugin supports the following Home Assistant device types:
  
+| Home Assistant | Indigo     |
+|----------------|------------|
+| Climate        | Thermostat |
+| Light          | Dimmer     |
+| Switch         | Relay      |
+| Binary Sensor  | Sensor     |
+| Sensor         | Sensor     |
