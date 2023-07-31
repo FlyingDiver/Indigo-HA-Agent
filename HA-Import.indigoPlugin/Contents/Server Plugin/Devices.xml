@@ -1,12 +1,14 @@
 <?xml version="1.0"?>
 <Devices>
 	<Device type="thermostat" id="HAclimate">
-		<Name>Home Assistant climate</Name>
+		<Name>Home Assistant Climate Device</Name>
 		<ConfigUI>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false" />
-			<Field id="address" type="textfield" defaultValue="climate.">
-				<Label>HA identity ID:</Label>
-			</Field>
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="climate" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
 			<Field type="separator" id="simpleSeparator1" />
 			<Field type="menu" id="NumTemperatureInputs" defaultValue="1">
 				<Label>Number of temperature sensors:</Label>
@@ -53,11 +55,13 @@
 	</Device>
 
 	<Device type="dimmer" id="HAdimmerType">
-		<Name>Home Assistant light</Name>
+		<Name>Home Assistant Light</Name>
 		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="light.">
-				<Label>HA identity ID:</Label>
-			</Field>
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="light" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
 				<Label>Enable status request / refresh button:</Label>
 			</Field>
@@ -72,11 +76,13 @@
 	</Device>
 
 	<Device type="relay" id="HAswitchType">
-		<Name>Home Assistant switch</Name>
+		<Name>Home Assistant Switch</Name>
 		<ConfigUI>
-			<Field id="address" type="textfield" defaultValue="switch.">
-				<Label>HA identity ID:</Label>
-			</Field>
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="switch" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
 				<Label>Enable status request / refresh button:</Label>
 			</Field>
@@ -91,13 +97,15 @@
 	</Device>
 
 	<Device type="sensor" id="HAbinarySensorType">
-		<Name>Home Assistant binary sensor</Name>
+		<Name>Home Assistant Binary Sensor</Name>
 		<ConfigUI>
 			<Field id="SupportsOnState" type="checkbox" defaultValue="true" hidden="true" />
 			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
-			<Field id="address" type="textfield" defaultValue="binary_sensor.">
-				<Label>HA identity ID:</Label>
-			</Field>
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="binary_sensor" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
 		</ConfigUI>
 		<States>
 			<State id="lastUpdated">
@@ -109,13 +117,15 @@
 	</Device>
 
 	<Device type="sensor" id="HAsensor">
-		<Name>Home Assistant sensor</Name>
+		<Name>Home Assistant Value Sensor</Name>
 		<ConfigUI>
 			<Field id="SupportsSensorValue" type="checkbox" defaultValue="true" hidden="true" />
 			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
-			<Field id="address" type="textfield" defaultValue="sensor.">
-				<Label>HA identity ID:</Label>
-			</Field>
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
 		</ConfigUI>
 		<States>
 			<State id="lastUpdated">
@@ -125,5 +135,4 @@
 			</State>
 		</States>
 	</Device>
-
 </Devices>
