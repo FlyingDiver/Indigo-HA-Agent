@@ -1,16 +1,20 @@
 <?xml version="1.0"?>
 <PluginConfig>
-	<Field type="textfield" id="serverAddress" defaultvalue="localhost">
-        <Label>Home Assistant Server Address:</Label>
+    <Field id="found_list" type="menu" defaultValue="" >
+        <Label>Discovered Home Assistant instances:</Label>
+        <List class="self" method="found_server_list" dynamicReload="true"/>
+        <CallbackMethod>menuChangedConfig</CallbackMethod>
     </Field>
-    <Field type="textfield" id="serverPort" defaultvalue="8123">
+	<Field type="textfield" id="address" defaultvalue="localhost">
+        <Label>Home Assistant Server Address:</Label>
+        <CallbackMethod>menuChangedConfig</CallbackMethod>
+  </Field>
+    <Field type="textfield" id="port" defaultvalue="8123">
         <Label>Home Assistant Server Port:</Label>
+        <CallbackMethod>menuChangedConfig</CallbackMethod>
     </Field>
     <Field type="textfield" id="haToken" defaultvalue="1234abcd">
         <Label>Home Assistant Long-Lived Access Tokens:</Label>
-    </Field>
-    <Field type="textfield" id="pollingInt" defaultvalue="2">
-         <Label>Home Assistant polling interval in seconds:</Label>
     </Field>
     <Field id="logLevel" type="menu" defaultValue="20">
         <Label>Event Logging Level:</Label>
