@@ -142,12 +142,28 @@ class Plugin(indigo.PluginBase):
         valuesDict['port'] = data['port']
         return valuesDict
 
+    def get_entity_list(self, filter="", valuesDict=None, typeId="", targetId=0):
+        retList = []
+        for entity_name, entity in self.ha_entity_map[filter].items():
+            retList.append((entity['entity_id'], entity_name))
+        retList.sort(key=lambda tup: tup[1])
+        self.logger.debug(f"get_entity_list for filter '{filter}': retList = {retList}")
+        return retList
+
     def menuChanged(self, valuesDict, typeId, devId):
         self.logger.debug(f"menuChanged: typeId = {typeId}, devId = {devId}, valuesDict = {valuesDict}")
-        valuesDict['address'] = valuesDict['found_list']
         return valuesDict
 
-    def update_device(self, entity_id, new_states):
+    def update_device(self, entity_id, entity):
+
+        # save the entity state info in the entity map
+        parts = entity['entity_id'].split('.')
+        if parts[0] not in self.ha_entity_map:
+            self.ha_entity_map[parts[0]] = {}
+        self.ha_entity_map[parts[0]][parts[1]] = entity
+
+        # find the matching Indigo device, update if we have one
+
         device_id = self.entity_devices.get(entity_id, None)
         if not device_id:
             self.logger.debug(f"Ignoring update from entity `{entity_id}`, no matching Indigo device found")
@@ -155,54 +171,54 @@ class Plugin(indigo.PluginBase):
 
         device = indigo.devices[device_id]
 
-        if new_states["last_updated"] == device.states['lastUpdated']:
+        if entity["last_updated"] == device.states['lastUpdated']:
             self.logger.debug(f"Device {device.name} already up to date")
             return
 
-        attributes = new_states.get("attributes", None)
+        attributes = entity.get("attributes", None)
         if not attributes:
             self.logger.error(f"Device {device.name} no attributes")
             return
 
-        self.logger.threaddebug(f"Updating device {device.name} with {new_states}")
+        self.logger.threaddebug(f"Updating device {device.name} with {entity}")
         if device.deviceTypeId == "HAclimate":
 
-            if new_states["last_updated"] != device.states['lastUpdated']:
+            if entity["last_updated"] != device.states['lastUpdated']:
                 update_list = [
                     {'key': "setpointHeat", 'value': attributes["temperature"]},
-                    {'key': "hvacOperationMode", 'value': kHvacModeStrToEnumMap[new_states["state"]]},
+                    {'key': "hvacOperationMode", 'value': kHvacModeStrToEnumMap[entity["state"]]},
                     {'key': "temperatureInput1", 'value': attributes["current_temperature"]},
-                    {'key': "lastUpdated", 'value': new_states["last_updated"]},
+                    {'key': "lastUpdated", 'value': entity["last_updated"]},
                 ]
                 device.updateStatesOnServer(update_list)
                 device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
         elif device.deviceTypeId == "HAbinarySensorType":
-            if new_states["last_updated"] != device.states['lastUpdated']:
-                if new_states["state"] == 'off':
+            if entity["last_updated"] != device.states['lastUpdated']:
+                if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
-                device.updateStateOnServer("lastUpdated", value=new_states["last_updated"])
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
         elif device.deviceTypeId == "HAsensor":
-            if new_states["last_updated"] != device.states['lastUpdated']:
-                device.updateStateOnServer("sensorValue", value=new_states["state"])
-                device.updateStateOnServer("lastUpdated", value=new_states["last_updated"])
+            if entity["last_updated"] != device.states['lastUpdated']:
+                device.updateStateOnServer("sensorValue", value=entity["state"])
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
         elif device.deviceTypeId == "HAswitchType":
-            if new_states["last_updated"] != device.states['lastUpdated']:
-                if new_states["state"] == 'off':
+            if entity["last_updated"] != device.states['lastUpdated']:
+                if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
                 device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
 
         elif device.deviceTypeId == "HAdimmerType":
-            if new_states["last_updated"] != device.states['lastUpdated']:
-                if new_states["state"] == 'off':
+            if entity["last_updated"] != device.states['lastUpdated']:
+                if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
@@ -328,6 +344,14 @@ class Plugin(indigo.PluginBase):
         if stateKey in dev.states:
             dev.updateStateOnServer(stateKey, float(newSetpoint), uiValue=f"{newSetpoint:.1f} °F")
 
+    ########################################
+    # Plugin Menu object callbacks
+    ########################################
+
+    def dumpEntities(self):
+        self.logger.info(f"\n{json.dumps(self.ha_entity_map, sort_keys=True, indent=4, separators=(',', ': '))}")
+        return True
+
     ################################################################################
     # Minimal Websocket Client
     ################################################################################
@@ -377,10 +401,6 @@ class Plugin(indigo.PluginBase):
                     for entity in msg['result']:
                         self.logger.debug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
                         self.update_device(entity['entity_id'], entity)
-                        parts = entity['entity_id'].split('.')
-                        if parts[0] not in self.ha_entity_map:
-                            self.ha_entity_map[parts[0]] = {}
-                        self.ha_entity_map[parts[0]][parts[1]] = entity['entity_id']
                     self.logger.debug(f"ha_entity_map: {json.dumps(self.ha_entity_map, indent=4, sort_keys=True)}")
                 del self.sent_messages[msg['id']]
             else:
