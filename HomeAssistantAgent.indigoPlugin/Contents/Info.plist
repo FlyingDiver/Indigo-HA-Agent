@@ -9,7 +9,7 @@
 	<key>IwsApiVersion</key>
 	<string>1.0.0</string>
 	<key>CFBundleDisplayName</key>
-	<string>HA Import</string>
+	<string>Home Assistant Agent</string>
 	<key>CFBundleIdentifier</key>
 	<string>no.homeassistant.plugin</string>
 	<key>CFBundleVersion</key>

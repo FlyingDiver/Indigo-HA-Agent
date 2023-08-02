@@ -120,8 +120,19 @@ class Plugin(indigo.PluginBase):
 
     def deviceStartComm(self, device):
         self.logger.info(f"{device.name}: Starting device with address: {device.address}")
-        self.entity_devices[device.address] = device.id
         device.stateListOrDisplayStateIdChanged()
+        self.entity_devices[device.address] = device.id
+        parts = device.address.split('.')
+        try:
+            entity = self.ha_entity_map[parts[0]][parts[1]]
+        except Exception as err:
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+        else:
+            self.update_device(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
+
+    def deviceStopComm(self, device):
+        self.logger.info(f"{device.name}: Stopping device with address: {device.address}")
+        del self.entity_devices[device.address]
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
@@ -154,7 +165,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(f"menuChanged: typeId = {typeId}, devId = {devId}, valuesDict = {valuesDict}")
         return valuesDict
 
-    def update_device(self, entity_id, entity):
+    def update_device(self, entity_id, entity, force_update=False):
 
         # save the entity state info in the entity map
         parts = entity['entity_id'].split('.')
@@ -166,13 +177,13 @@ class Plugin(indigo.PluginBase):
 
         device_id = self.entity_devices.get(entity_id, None)
         if not device_id:
-            self.logger.debug(f"Ignoring update from entity `{entity_id}`, no matching Indigo device found")
+            self.logger.threaddebug(f"Ignoring update from entity `{entity_id}`, no matching Indigo device found")
             return
 
         device = indigo.devices[device_id]
 
-        if entity["last_updated"] == device.states['lastUpdated']:
-            self.logger.debug(f"Device {device.name} already up to date")
+        if entity["last_updated"] == device.states['lastUpdated'] and not force_update:
+            self.logger.threaddebug(f"Device {device.name} already up to date")
             return
 
         attributes = entity.get("attributes", None)
@@ -180,41 +191,60 @@ class Plugin(indigo.PluginBase):
             self.logger.error(f"Device {device.name} no attributes")
             return
 
-        self.logger.threaddebug(f"Updating device {device.name} with {entity}")
+        self.logger.debug(f"Updating device {device.name} with {entity}")
         if device.deviceTypeId == "HAclimate":
 
             if entity["last_updated"] != device.states['lastUpdated']:
                 update_list = [
-                    {'key': "setpointHeat", 'value': attributes["temperature"]},
+                    {'key': "temperatureInput1", 'value': attributes["current_temperature"], 'uiValue': f"{attributes['current_temperature']}\u00b0F"},
+                    {'key': "humidityInput1", 'value': attributes["current_humidity"]},
+                    {'key': "setpointHeat", 'value': attributes["temperature"], 'uiValue': f"{attributes['temperature']}\u00b0F"},
+                    {'key': "setpointCool", 'value': attributes["temperature"], 'uiValue': f"{attributes['temperature']}\u00b0F"},
                     {'key': "hvacOperationMode", 'value': kHvacModeStrToEnumMap[entity["state"]]},
-                    {'key': "temperatureInput1", 'value': attributes["current_temperature"]},
+                    {'key': "hvacFanIsOn", 'value': attributes["fan_mode"] == "on"},
+                    {'key': "hvacFanMode", 'value': kFanModeStrToEnumMap[attributes["fan_mode"]]},
+                    {'key': "climate_mode", 'value': attributes["climate_mode"]},
                     {'key': "lastUpdated", 'value': entity["last_updated"]},
                 ]
-                device.updateStatesOnServer(update_list)
-                device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
+                try:
+                    self.logger.threaddebug(f"do_update: update_list: {update_list}")
+                    device.updateStatesOnServer(update_list)
+                except Exception as e:
+                    self.logger.error(f"{device.name}: failed to update states: {e}")
 
         elif device.deviceTypeId == "HAbinarySensorType":
             if entity["last_updated"] != device.states['lastUpdated']:
-                if entity["state"] == 'off':
+                isOff = entity["state"] == 'off'
+                if isOff:
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
-                device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
+                if attributes.get('device_class', None) == 'occupancy':
+                    device.updateStateImageOnServer(indigo.kStateImageSel.MotionSensor if isOff else indigo.kStateImageSel.MotionSensorTripped)
+                elif attributes.get('device_class', None) == 'problem':
+                    device.updateStateImageOnServer(indigo.kStateImageSel.SensorOn if isOff else indigo.kStateImageSel.SensorTripped)
+                else:
+                    device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         elif device.deviceTypeId == "HAsensor":
             if entity["last_updated"] != device.states['lastUpdated']:
-                device.updateStateOnServer("sensorValue", value=entity["state"])
+                units = attributes.get("unit_of_measurement", "")
+                device.updateStateOnServer("sensorValue", value=entity["state"], uiValue=f"{entity['state']}{units}")
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
-                device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
-
+                if attributes.get('device_class', None) == 'temperature':
+                    device.updateStateImageOnServer(indigo.kStateImageSel.TemperatureSensor)
+                elif attributes.get('device_class', None) == 'humidity':
+                    device.updateStateImageOnServer(indigo.kStateImageSel.HumiditySensor)
+                else:
+                    device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
         elif device.deviceTypeId == "HAswitchType":
             if entity["last_updated"] != device.states['lastUpdated']:
                 if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
-                device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
+                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         elif device.deviceTypeId == "HAdimmerType":
             if entity["last_updated"] != device.states['lastUpdated']:
@@ -224,7 +254,7 @@ class Plugin(indigo.PluginBase):
                     device.updateStateOnServer("onOffState", value=True)
                     brightness = attributes.get("brightness", 0) / 2.55
                     device.updateStateOnServer("brightnessLevel", value=round(brightness))
-                device.updateStateImageOnServer(indigo.kStateImageSel.Auto)
+                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         else:
             self.logger.error(f"{device.name}: Unknown device type: {device.deviceTypeId}")
@@ -298,51 +328,25 @@ class Plugin(indigo.PluginBase):
 
     ######################
     # Process action request from Indigo Server to change main thermostat's main mode.
-    def _handleChangeHvacModeAction(self, dev, newHvacMode):
+    def _handleChangeHvacModeAction(self, device, newHvacMode):
         headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-
-        if newHvacMode == 0:
-            newHvacModeHA = 'off'
-        else:
-            newHvacModeHA = 'heat'
-        self.logger.info(f"newHVACmode: {newHvacModeHA}")
+        self.logger.debug(f"{device.name}: newHVACmode: {newHvacMode} ({kHvacModeEnumToStrMap[newHvacMode]})")
 
         url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_operation_mode"  # noqa
-        newHvacModeHA = action.actionValue
-        post_data = {"entity_id": dev.address, "operation_mode": newHvacModeHA}
+        post_data = {"entity_id": device.address, "operation_mode": kHvacModeEnumToStrMap[newHvacMode]}
         r = requests.post(url, headers=headers, json=post_data)
-
-        actionStr = _lookupActionStrFromHvacMode(newHvacMode)
-        self.logger.debug(f"sent \"{dev.name}\" mode change to {actionStr}")
-        if "hvacOperationMode" in dev.states:
-            dev.updateStateOnServer("hvacOperationMode", newHvacMode)
 
     ######################
     # Process action request from Indigo Server to change a cool/heat setpoint.
-    def _handleChangeSetpointAction(self, dev, newSetpoint, logActionName, stateKey):
+    def _handleChangeSetpointAction(self, device, newSetpoint, logActionName, stateKey):
         headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-
-        url = f"http://{self.server_address}:{self.server_port}/api/states/{dev.address}"  # noqa
-        ha_device = requests.get(url, headers=headers).json()
-        self.logger.debug(f"Device content:\n{ha_device}")
-        att = ha_device["attributes"]
-        SetpointMaxHA = att["max_temp"]
-        SetpointMinHA = att["min_temp"]
-
-        if newSetpoint < SetpointMinHA:
-            newSetpoint = SetpointMinHA  # Arbitrary -- set to whatever hardware minimum setpoint value is.
-        elif newSetpoint > SetpointMaxHA:
-            newSetpoint = SetpointMaxHA  # Arbitrary -- set to whatever hardware maximum setpoint value is.
 
         if stateKey in ["setpointCool", "setpointHeat"]:
             url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_temperature"  # noqa
-            newHvacModeHA = action.actionValue
-            post_data = {"entity_id": dev.address, "temperature": newSetpoint}
+            post_data = {"entity_id": device.address, "temperature": newSetpoint}
             r = requests.post(url, headers=headers, json=post_data)
-            self.logger.debug(f"sent \"{dev.name}\" {logActionName} to {newSetpoint:.1f}°")
+            self.logger.debug(f"{device.name}: _handleChangeSetpointAction: {stateKey} {newSetpoint:.1f}")
 
-        if stateKey in dev.states:
-            dev.updateStateOnServer(stateKey, float(newSetpoint), uiValue=f"{newSetpoint:.1f} °F")
 
     ########################################
     # Plugin Menu object callbacks
@@ -400,7 +404,7 @@ class Plugin(indigo.PluginBase):
                 elif self.sent_messages[msg['id']] == "get_states":
                     for entity in msg['result']:
                         self.logger.debug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
-                        self.update_device(entity['entity_id'], entity)
+                        self.update_device(entity['entity_id'], entity, force_update=True)
                     self.logger.debug(f"ha_entity_map: {json.dumps(self.ha_entity_map, indent=4, sort_keys=True)}")
                 del self.sent_messages[msg['id']]
             else:
@@ -431,6 +435,7 @@ class Plugin(indigo.PluginBase):
                   'core_config_updated',
                   'call_service',
                   'config_entry_discovered',
+                  'panels_updated',
               ]):
             pass
 
