@@ -4,10 +4,15 @@
 import indigo
 import requests
 import logging
-import websocket
 import json
 import threading
-from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
+
+try:
+    import websocket
+    from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
+except ImportError:
+    raise ImportError("'Required Python libraries missing.  Run 'pip3 install websocket-client zeroconf' in Terminal window, then reload plugin.")
+
 
 ################################################################################
 HVAC_MODE_ENUM_TO_STR_MAP = {
@@ -223,17 +228,26 @@ class Plugin(indigo.PluginBase):
             if entity["last_updated"] != device.states['lastUpdated']:
                 update_list = [
                     {'key': "hvacOperationMode", 'value': HVAC_MODE_STR_TO_ENUM_MAP[entity["state"].lower()]},
-                    {'key': "hvacFanIsOn", 'value': attributes["fan_mode"] == "on"},
-                    {'key': "preset_mode", 'value': attributes.get("preset_mode", "")},
                     {'key': "lastUpdated", 'value': entity["last_updated"]},
                 ]
                 # HA setpoints are wonky
+                if attributes.get("preset_mode", None):
+                    update_list.append({'key': "preset_mode", 'value': attributes["preset_mode"]})
+                else:
+                    update_list.append({'key': "preset_mode", 'value': ""})
+
+                if attributes.get("current_temperature", None):
+                    update_list.append({'key': "hvacFanIsOn", 'value': attributes["fan_mode"] == "on"})
+
                 if attributes.get("current_temperature", None):
                     update_list.append({'key': "temperatureInput1", 'value': attributes["current_temperature"], 'uiValue': f"{attributes['current_temperature']}\u00b0F"})
+
                 if attributes.get("current_humidity", None):
                     update_list.append({'key': "humidityInput1", 'value': attributes["current_humidity"]})
+
                 if attributes.get("fan_mode", None):
                     update_list.append({'key': "hvacFanMode", 'value': FAN_MODE_STR_TO_ENUM_MAP[attributes["fan_mode"].lower()]})
+
                 if attributes.get("temperature", None):
                     update_list.append({'key': "setpointHeat", 'value': attributes["temperature"]})
                     update_list.append({'key': "setpointCool", 'value': attributes["temperature"]})
@@ -475,6 +489,7 @@ class Plugin(indigo.PluginBase):
                   'config_entry_discovered',
                   'panels_updated',
                   'area_registry_updated',
+                  'automation_triggered',
               ]):
             pass
 
