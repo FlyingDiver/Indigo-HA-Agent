@@ -10,41 +10,35 @@ import threading
 from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
 
 ################################################################################
-kHvacModeEnumToStrMap = {
+HVAC_MODE_ENUM_TO_STR_MAP = {
     indigo.kHvacMode.Cool: "cool",
     indigo.kHvacMode.Heat: "heat",
-    indigo.kHvacMode.HeatCool: "auto",
+    indigo.kHvacMode.HeatCool: "heat_cool",
     indigo.kHvacMode.Off: "off",
-    indigo.kHvacMode.ProgramHeat: "program heat",
-    indigo.kHvacMode.ProgramCool: "program cool",
-    indigo.kHvacMode.ProgramHeatCool: "program auto"
+    indigo.kHvacMode.ProgramHeat: "heat",
+    indigo.kHvacMode.ProgramCool: "cool",
+    indigo.kHvacMode.ProgramHeatCool: "heat_cool"
 }
 
-kHvacModeStrToEnumMap = {
+HVAC_MODE_STR_TO_ENUM_MAP = {
     'heat': indigo.kHvacMode.Heat,
     'cool': indigo.kHvacMode.Cool,
+    'heat_cool': indigo.kHvacMode.HeatCool,
     'auto': indigo.kHvacMode.HeatCool,
+    'dry': indigo.kHvacMode.Off,
+    'fan_only': indigo.kHvacMode.Off,
     'off': indigo.kHvacMode.Off
 }
 
-kFanModeEnumToStrMap = {
+FAN_MODE_ENUM_TO_STR_MAP = {
     indigo.kFanMode.AlwaysOn: "always on",
     indigo.kFanMode.Auto: "auto"
 }
 
-kFanModeStrToEnumMap = {
+FAN_MODE_STR_TO_ENUM_MAP = {
     'auto': indigo.kFanMode.Auto,
     'on': indigo.kFanMode.AlwaysOn
 }
-
-
-def _lookupActionStrFromHvacMode(hvacMode):
-    return kHvacModeEnumToStrMap.get(hvacMode, "unknown")
-
-
-def _lookupActionStrFromFanMode(fanMode):
-    return kFanModeEnumToStrMap.get(fanMode, "unknown")
-
 
 ################################################################################
 
@@ -59,7 +53,7 @@ class Plugin(indigo.PluginBase):
         pfmt = logging.Formatter('%(asctime)s.%(msecs)03d\t[%(levelname)8s] %(name)20s.%(funcName)-25s%(msg)s', datefmt='%Y-%m-%d %H:%M:%S')
         self.plugin_file_handler.setFormatter(pfmt)
 
-        self.thread = None
+        self.websocket_thread = None
         self.logLevel = None
         self.ha_token = None
         self.server_port = None
@@ -92,7 +86,7 @@ class Plugin(indigo.PluginBase):
 
         # start up the websocket receiver thread
         ws_url = f"ws://{self.server_address}:{self.server_port}/api/websocket"
-        self.thread = threading.Thread(target=self.ws_client, args=(ws_url,)).start()
+        self.websocket_thread = threading.Thread(target=self.ws_client, args=(ws_url,)).start()
 
     def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
@@ -127,8 +121,40 @@ class Plugin(indigo.PluginBase):
             entity = self.ha_entity_map[parts[0]][parts[1]]
         except Exception as err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
-        else:
-            self.update_device(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
+            return
+
+        # check the attributes for the device and update the Indigo device definition
+        new_props = device.pluginProps
+        if device.deviceTypeId == "HAclimate":
+            if entity['attributes'].get('current_temperature', None):
+                new_props["NumTemperatureInputs"] = 1
+            else:
+                new_props["NumTemperatureInputs"] = 0
+
+            if entity['attributes'].get('current_humidity', None):
+                new_props["NumHumidityInputs"] = 1
+            else:
+                new_props["NumHumidityInputs"] = 0
+
+            if entity['attributes'].get('fan_mode', None):
+                new_props["SupportsHvacFanMode"] = True
+            else:
+                new_props["SupportsHvacFanMode"] = False
+
+        elif device.deviceTypeId == "HAdimmerType":
+            pass
+
+        elif device.deviceTypeId == "HAswitchType":
+            pass
+
+        elif device.deviceTypeId == "HAbinarySensorType":
+            pass
+
+        elif device.deviceTypeId == "HAsensor":
+            pass
+
+        device.replacePluginPropsOnServer(new_props)
+        self.update_device(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
 
     def deviceStopComm(self, device):
         self.logger.info(f"{device.name}: Stopping device with address: {device.address}")
@@ -196,16 +222,24 @@ class Plugin(indigo.PluginBase):
 
             if entity["last_updated"] != device.states['lastUpdated']:
                 update_list = [
-                    {'key': "temperatureInput1", 'value': attributes["current_temperature"], 'uiValue': f"{attributes['current_temperature']}\u00b0F"},
-                    {'key': "humidityInput1", 'value': attributes["current_humidity"]},
-                    {'key': "setpointHeat", 'value': attributes["temperature"], 'uiValue': f"{attributes['temperature']}\u00b0F"},
-                    {'key': "setpointCool", 'value': attributes["temperature"], 'uiValue': f"{attributes['temperature']}\u00b0F"},
-                    {'key': "hvacOperationMode", 'value': kHvacModeStrToEnumMap[entity["state"]]},
+                    {'key': "hvacOperationMode", 'value': HVAC_MODE_STR_TO_ENUM_MAP[entity["state"].lower()]},
                     {'key': "hvacFanIsOn", 'value': attributes["fan_mode"] == "on"},
-                    {'key': "hvacFanMode", 'value': kFanModeStrToEnumMap[attributes["fan_mode"]]},
-                    {'key': "climate_mode", 'value': attributes["climate_mode"]},
+                    {'key': "preset_mode", 'value': attributes.get("preset_mode", "")},
                     {'key': "lastUpdated", 'value': entity["last_updated"]},
                 ]
+                # HA setpoints are wonky
+                if attributes.get("current_temperature", None):
+                    update_list.append({'key': "temperatureInput1", 'value': attributes["current_temperature"], 'uiValue': f"{attributes['current_temperature']}\u00b0F"})
+                if attributes.get("current_humidity", None):
+                    update_list.append({'key': "humidityInput1", 'value': attributes["current_humidity"]})
+                if attributes.get("fan_mode", None):
+                    update_list.append({'key': "hvacFanMode", 'value': FAN_MODE_STR_TO_ENUM_MAP[attributes["fan_mode"].lower()]})
+                if attributes.get("temperature", None):
+                    update_list.append({'key': "setpointHeat", 'value': attributes["temperature"]})
+                    update_list.append({'key': "setpointCool", 'value': attributes["temperature"]})
+                elif attributes.get('target_temp_high', None) and attributes.get('target_temp_low', None):
+                        update_list.append({'key': "setpointHeat", 'value': attributes["target_temp_low"]})
+                        update_list.append({'key': "setpointCool", 'value': attributes["target_temp_high"]})
                 try:
                     self.logger.threaddebug(f"do_update: update_list: {update_list}")
                     device.updateStatesOnServer(update_list)
@@ -330,10 +364,18 @@ class Plugin(indigo.PluginBase):
     # Process action request from Indigo Server to change main thermostat's main mode.
     def _handleChangeHvacModeAction(self, device, newHvacMode):
         headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-        self.logger.debug(f"{device.name}: newHVACmode: {newHvacMode} ({kHvacModeEnumToStrMap[newHvacMode]})")
+        self.logger.debug(f"{device.name}: newHVACmode: {newHvacMode} ({HVAC_MODE_ENUM_TO_STR_MAP[newHvacMode]})")
 
-        url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_operation_mode"  # noqa
-        post_data = {"entity_id": device.address, "operation_mode": kHvacModeEnumToStrMap[newHvacMode]}
+        url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_hvac_mode"  # noqa
+        post_data = {"entity_id": device.address, "hvac_mode": HVAC_MODE_ENUM_TO_STR_MAP[newHvacMode]}
+        r = requests.post(url, headers=headers, json=post_data)
+
+    def _handleChangeFanModeAction(self, device, newFanMode):
+        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
+        self.logger.debug(f"{device.name}: newFanMode: {newFanMode} ({HVAC_MODE_ENUM_TO_STR_MAP[newFanMode]})")
+
+        url = f"http://{self.server_address}:{self.server_port}/api/services/fan/set_fan_mode"  # noqa
+        post_data = {"entity_id": device.address, "fan_mode": HVAC_MODE_ENUM_TO_STR_MAP[newFanMode]}
         r = requests.post(url, headers=headers, json=post_data)
 
     ######################
@@ -346,7 +388,6 @@ class Plugin(indigo.PluginBase):
             post_data = {"entity_id": device.address, "temperature": newSetpoint}
             r = requests.post(url, headers=headers, json=post_data)
             self.logger.debug(f"{device.name}: _handleChangeSetpointAction: {stateKey} {newSetpoint:.1f}")
-
 
     ########################################
     # Plugin Menu object callbacks
@@ -369,7 +410,7 @@ class Plugin(indigo.PluginBase):
         self.ws.run_forever(ping_interval=50, reconnect=5)
 
     def on_open(self, ws):
-        self.logger.debug(f"Websocket on_open")
+        self.logger.debug(f"Websocket connected")
 
     def on_message(self, ws, message):
         self.logger.threaddebug(f"Websocket on_message: {message}")
@@ -383,14 +424,10 @@ class Plugin(indigo.PluginBase):
             self.logger.debug(f"Websocket got auth_ok for ha_version {msg['ha_version']}")
 
             # subscribe to events
-            self.last_sent_id += 1
-            self.ws.send(json.dumps({'id': self.last_sent_id, 'type': 'subscribe_events'}))
-            self.sent_messages[self.last_sent_id] = "subscribe_events"
+            self.send_ws('subscribe_events')
 
             # get states to populate devices, and build a list of the current home assistant entities
-            self.last_sent_id += 1
-            self.ws.send(json.dumps({'id': self.last_sent_id, 'type': 'get_states'}))
-            self.sent_messages[self.last_sent_id] = "get_states"
+            self.send_ws('get_states')
 
         elif msg['type'] == 'auth_invalid':
             self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
@@ -407,6 +444,7 @@ class Plugin(indigo.PluginBase):
                         self.update_device(entity['entity_id'], entity, force_update=True)
                     self.logger.debug(f"ha_entity_map: {json.dumps(self.ha_entity_map, indent=4, sort_keys=True)}")
                 del self.sent_messages[msg['id']]
+
             else:
                 self.logger.debug(f"Websocket got result for unknown message id: {msg['id']}")
 
@@ -436,11 +474,17 @@ class Plugin(indigo.PluginBase):
                   'call_service',
                   'config_entry_discovered',
                   'panels_updated',
+                  'area_registry_updated',
               ]):
             pass
 
         else:
             self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
+
+    def send_ws(self, msg=None):
+        self.last_sent_id += 1
+        self.ws.send(json.dumps({'id': self.last_sent_id, 'type': msg}))
+        self.sent_messages[self.last_sent_id] = msg
 
     def on_close(self, ws, close_status_code, close_msg):
         self.logger.debug(f"Websocket on_close: {close_status_code} {close_msg}")

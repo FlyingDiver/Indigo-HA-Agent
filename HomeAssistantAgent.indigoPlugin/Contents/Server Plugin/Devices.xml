@@ -4,12 +4,12 @@
 		<Name>Home Assistant Climate Device</Name>
 		<ConfigUI>
 			<Field id="SupportsStatusRequest"        type="checkbox"  defaultValue="false" hidden="true" />
-            <Field id="NumTemperatureInputs"         type="textfield" defaultValue="1"     hidden="true"/>
-            <Field id="NumHumidityInputs"            type="textfield" defaultValue="1"     hidden="true"/>
+            <Field id="NumTemperatureInputs"         type="textfield" defaultValue="0"     hidden="true"/>
+            <Field id="NumHumidityInputs"            type="textfield" defaultValue="0"     hidden="true"/>
 			<Field id="SupportsHeatSetpoint"         type="checkbox"  defaultValue="true"  hidden="true"/>
             <Field id="SupportsCoolSetpoint"         type="checkbox"  defaultValue="true"  hidden="true"/>
             <Field id="SupportsHvacOperationMode"    type="checkbox"  defaultValue="true"  hidden="true"/>
-            <Field id="SupportsHvacFanMode"          type="checkbox"  defaultValue="true"  hidden="true"/>
+            <Field id="SupportsHvacFanMode"          type="checkbox"  defaultValue="false"  hidden="true"/>
             <Field id="ShowCoolHeatEquipmentStateUI" type="checkbox"  defaultValue="true"  hidden="true"/>
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
@@ -18,10 +18,10 @@
             </Field>
 		</ConfigUI>
 		<States>
-			<State id="climate_mode">
+			<State id="preset_mode">
 				<ValueType>String</ValueType>
-				<TriggerLabel>climate_mode</TriggerLabel>
-				<ControlPageLabel>climate_mode</ControlPageLabel>
+				<TriggerLabel>preset_mode</TriggerLabel>
+				<ControlPageLabel>preset_mode</ControlPageLabel>
 			</State>
 			<State id="lastUpdated">
 				<ValueType>String</ValueType>
