@@ -13,6 +13,11 @@ try:
 except ImportError:
     raise ImportError("'Required Python libraries missing.  Run 'pip3 install websocket-client zeroconf' in Terminal window, then reload plugin.")
 
+def updateVar(name, value, folder):
+    if name not in indigo.variables:
+        indigo.variable.create(name, value=value, folder=folder)
+    else:
+        indigo.variable.updateValue(name, value)
 
 ################################################################################
 HVAC_MODE_ENUM_TO_STR_MAP = {
@@ -32,7 +37,8 @@ HVAC_MODE_STR_TO_ENUM_MAP = {
     'auto': indigo.kHvacMode.HeatCool,
     'dry': indigo.kHvacMode.Off,
     'fan_only': indigo.kHvacMode.Off,
-    'off': indigo.kHvacMode.Off
+    'off': indigo.kHvacMode.Off,
+    'unavailable': indigo.kHvacMode.Off
 }
 
 FAN_MODE_ENUM_TO_STR_MAP = {
@@ -92,6 +98,13 @@ class Plugin(indigo.PluginBase):
         # start up the websocket receiver thread
         ws_url = f"ws://{self.server_address}:{self.server_port}/api/websocket"
         self.websocket_thread = threading.Thread(target=self.ws_client, args=(ws_url,)).start()
+
+        # get the folder for the event variables
+        if "HAA_Event" in indigo.variables.folders:
+            myFolder = indigo.variables.folders["HAA_Event"]
+        else:
+            myFolder = indigo.variables.folder.create("HAA_Event")
+        self.pluginPrefs["folderId"] = myFolder.id
 
     def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
@@ -159,7 +172,7 @@ class Plugin(indigo.PluginBase):
             pass
 
         device.replacePluginPropsOnServer(new_props)
-        self.update_device(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
+        self.ha_entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
 
     def deviceStopComm(self, device):
         self.logger.info(f"{device.name}: Stopping device with address: {device.address}")
@@ -196,10 +209,15 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(f"menuChanged: typeId = {typeId}, devId = {devId}, valuesDict = {valuesDict}")
         return valuesDict
 
-    def update_device(self, entity_id, entity, force_update=False):
+    def ha_entity_update(self, entity_id, entity, force_update=False):
+        parts = entity_id.split('.')
+
+        # check for deleted entity
+        if entity is None:
+            del self.ha_entity_map[parts[0]][parts[1]]
+            return
 
         # save the entity state info in the entity map
-        parts = entity['entity_id'].split('.')
         if parts[0] not in self.ha_entity_map:
             self.ha_entity_map[parts[0]] = {}
         self.ha_entity_map[parts[0]][parts[1]] = entity
@@ -252,8 +270,8 @@ class Plugin(indigo.PluginBase):
                     update_list.append({'key': "setpointHeat", 'value': attributes["temperature"]})
                     update_list.append({'key': "setpointCool", 'value': attributes["temperature"]})
                 elif attributes.get('target_temp_high', None) and attributes.get('target_temp_low', None):
-                        update_list.append({'key': "setpointHeat", 'value': attributes["target_temp_low"]})
-                        update_list.append({'key': "setpointCool", 'value': attributes["target_temp_high"]})
+                    update_list.append({'key': "setpointHeat", 'value': attributes["target_temp_low"]})
+                    update_list.append({'key': "setpointCool", 'value': attributes["target_temp_high"]})
                 try:
                     self.logger.threaddebug(f"do_update: update_list: {update_list}")
                     device.updateStatesOnServer(update_list)
@@ -455,7 +473,7 @@ class Plugin(indigo.PluginBase):
                 elif self.sent_messages[msg['id']] == "get_states":
                     for entity in msg['result']:
                         self.logger.debug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
-                        self.update_device(entity['entity_id'], entity, force_update=True)
+                        self.ha_entity_update(entity['entity_id'], entity, force_update=True)
                     self.logger.debug(f"ha_entity_map: {json.dumps(self.ha_entity_map, indent=4, sort_keys=True)}")
                 del self.sent_messages[msg['id']]
 
@@ -464,33 +482,55 @@ class Plugin(indigo.PluginBase):
 
         elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'state_changed':
             try:
-                self.update_device(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
+                self.ha_entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
             except Exception as e:
                 self.logger.error(f"Websocket state_changed exception: {e}")
                 self.logger.debug(f"Websocket state_changed:\n{msg}")
 
         elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
-            self.logger.debug(
-                f"Button event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
+            self.logger.debug(f"Button event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
+
+        elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'call_service':
+            data = msg['event']['data']
+            self.logger.debug(f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
+
+        elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'automation_triggered':
+            data = msg['event']['data']
+            self.logger.debug(f"automation_triggered event: {data.get('name', None)} {data.get('entity_id', None)}:\n{json.dumps(msg, indent=4, sort_keys=True)}")
+
+            updateVar("event_id", data.get('entity_id', None), indigo.activePlugin.pluginPrefs["folderId"])
+            updateVar("event_type", msg['event'].get('event_type', None), indigo.activePlugin.pluginPrefs["folderId"])
+            updateVar("event_time", msg['event'].get('time_fired', None), indigo.activePlugin.pluginPrefs["folderId"])
+            updateVar("event_origin", msg['event'].get('origin', None), indigo.activePlugin.pluginPrefs["folderId"])
+            updateVar("event_name", data.get('name', None), indigo.activePlugin.pluginPrefs["folderId"])
+
+            for trigger in indigo.triggers.iter("self"):
+                if trigger.pluginTypeId == "automationEvent":
+                    indigo.trigger.execute(trigger)
 
         elif (msg.get('type', None) == 'event' and
-              msg['event'].get('event_type', None) in [
-                  'recorder_5min_statistics_generated',
-                  'recorder_hourly_statistics_generated',
-                  'lovelace_updated',
-                  'device_registry_updated',
-                  'entity_registry_updated',
-                  'service_registered',
-                  'component_loaded',
-                  'homeassistant_started',
-                  'homeassistant_start',
-                  'core_config_updated',
-                  'call_service',
-                  'config_entry_discovered',
-                  'panels_updated',
-                  'area_registry_updated',
-                  'automation_triggered',
-              ]):
+            msg['event'].get('event_type', None) in [
+                'recorder_5min_statistics_generated',
+                'recorder_hourly_statistics_generated',
+                'lovelace_updated',
+                'device_registry_updated',
+                'entity_registry_updated',
+                'service_registered',
+                'service_removed',
+                'script_started',
+                'component_loaded',
+                'homeassistant_started',
+                'homeassistant_start',
+                'core_config_updated',
+                'config_entry_discovered',
+                'panels_updated',
+                'area_registry_updated',
+                'ios.became_active',
+                'ios.entered_background',
+                'ios.notification_action_fired',
+                'mobile_app_notification_action',
+                'automation_reloaded',
+            ]):
             pass
 
         else:
