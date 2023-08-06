@@ -6,10 +6,10 @@
 			<Field id="SupportsStatusRequest"        type="checkbox"  defaultValue="false" hidden="true" />
             <Field id="NumTemperatureInputs"         type="textfield" defaultValue="0"     hidden="true"/>
             <Field id="NumHumidityInputs"            type="textfield" defaultValue="0"     hidden="true"/>
-			<Field id="SupportsHeatSetpoint"         type="checkbox"  defaultValue="true"  hidden="true"/>
-            <Field id="SupportsCoolSetpoint"         type="checkbox"  defaultValue="true"  hidden="true"/>
+            <Field id="SupportsHvacFanMode"          type="checkbox"  defaultValue="false" hidden="true"/>
+			<Field id="SupportsHeatSetpoint"         type="checkbox"  defaultValue="false" hidden="true"/>
+            <Field id="SupportsCoolSetpoint"         type="checkbox"  defaultValue="false" hidden="true"/>
             <Field id="SupportsHvacOperationMode"    type="checkbox"  defaultValue="true"  hidden="true"/>
-            <Field id="SupportsHvacFanMode"          type="checkbox"  defaultValue="false"  hidden="true"/>
             <Field id="ShowCoolHeatEquipmentStateUI" type="checkbox"  defaultValue="true"  hidden="true"/>
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
@@ -18,6 +18,46 @@
             </Field>
 		</ConfigUI>
 		<States>
+			<State id="hvac_modes">
+				<ValueType>String</ValueType>
+				<TriggerLabel>hvac_modes</TriggerLabel>
+				<ControlPageLabel>hvac_modes</ControlPageLabel>
+			</State>
+			<State id="hvac_mode">
+				<ValueType>String</ValueType>
+				<TriggerLabel>hvac_mode</TriggerLabel>
+				<ControlPageLabel>hvac_mode</ControlPageLabel>
+			</State>
+			<State id="hvac_action">
+				<ValueType>String</ValueType>
+				<TriggerLabel>hvac_action</TriggerLabel>
+				<ControlPageLabel>hvac_action</ControlPageLabel>
+			</State>
+			<State id="fan_modes">
+				<ValueType>String</ValueType>
+				<TriggerLabel>hvac_modes</TriggerLabel>
+				<ControlPageLabel>hvac_modes</ControlPageLabel>
+			</State>
+			<State id="fan_mode">
+				<ValueType>String</ValueType>
+				<TriggerLabel>hvac_mode</TriggerLabel>
+				<ControlPageLabel>hvac_mode</ControlPageLabel>
+			</State>
+			<State id="swing_modes">
+				<ValueType>String</ValueType>
+				<TriggerLabel>hvac_modes</TriggerLabel>
+				<ControlPageLabel>hvac_modes</ControlPageLabel>
+			</State>
+			<State id="swing_mode">
+				<ValueType>String</ValueType>
+				<TriggerLabel>hvac_mode</TriggerLabel>
+				<ControlPageLabel>hvac_mode</ControlPageLabel>
+			</State>
+			<State id="preset_modes">
+				<ValueType>String</ValueType>
+				<TriggerLabel>preset_modes</TriggerLabel>
+				<ControlPageLabel>preset_modes</ControlPageLabel>
+			</State>
 			<State id="preset_mode">
 				<ValueType>String</ValueType>
 				<TriggerLabel>preset_mode</TriggerLabel>

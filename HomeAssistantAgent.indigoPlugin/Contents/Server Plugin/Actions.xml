@@ -1,3 +1,52 @@
 <?xml version="1.0"?>
 <Actions>
+    <Action id="set_hvac_mode" deviceFilter="self.HAclimate">
+        <Name>Set HVAC Mode</Name>
+        <CallbackMethod>set_hvac_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="hvac_mode" type="menu">
+                <Label>HVAC Mode:</Label>
+                 <List class="self" filter="" method="hvac_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_fan_mode" deviceFilter="self.HAclimate">
+        <Name>Set Fan Mode</Name>
+        <CallbackMethod>set_fan_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="fan_mode" type="menu">
+                <Label>Fan Mode:</Label>
+                 <List class="self" filter="" method="fan_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_swing_mode" deviceFilter="self.HAclimate">
+        <Name>Set Swing Mode</Name>
+        <CallbackMethod>set_swing_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="swing_mode" type="menu">
+                <Label>Swing Mode:</Label>
+                 <List class="self" filter="" method="swing_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_preset_mode" deviceFilter="self.HAclimate">
+        <Name>Set Preset Mode</Name>
+        <CallbackMethod>set_preset_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="preset_mode" type="menu">
+                <Label>Preset Mode:</Label>
+                 <List class="self" filter="" method="preset_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_humidity" deviceFilter="self.HAclimate">
+        <Name>Set Humidity Target</Name>
+        <CallbackMethod>set_humidity_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="humidity" type="textfield" default="50">
+                <Label>Humidity:</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
 </Actions>

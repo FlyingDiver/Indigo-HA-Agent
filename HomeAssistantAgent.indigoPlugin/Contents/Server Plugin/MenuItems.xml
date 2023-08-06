@@ -1,5 +1,9 @@
 <?xml version="1.0"?>
 <MenuItems>
+    <MenuItem id="get_states">
+        <Name>Update Devices</Name>
+        <CallbackMethod>get_states</CallbackMethod>
+    </MenuItem>
     <MenuItem id="dumpEntities">
         <Name>Write Home Assistant Entity Information to Log</Name>
         <CallbackMethod>dumpEntities</CallbackMethod>
