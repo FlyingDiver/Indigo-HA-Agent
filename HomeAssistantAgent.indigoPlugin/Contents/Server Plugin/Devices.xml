@@ -74,16 +74,19 @@
 	<Device type="dimmer" id="HAdimmerType">
 		<Name>Home Assistant Light</Name>
 		<ConfigUI>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="light" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
-            </Field>
-			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
-				<Label>Enable status request / refresh button:</Label>
 			</Field>
 		</ConfigUI>
 		<States>
+			<State id="supported_color_modes">
+				<ValueType>String</ValueType>
+				<TriggerLabel>supported_color_modes</TriggerLabel>
+				<ControlPageLabel>supported_color_modes</ControlPageLabel>
+			</State>
 			<State id="lastUpdated">
 				<ValueType>String</ValueType>
 				<TriggerLabel>lastUpdated</TriggerLabel>
@@ -95,14 +98,12 @@
 	<Device type="relay" id="HAswitchType">
 		<Name>Home Assistant Switch</Name>
 		<ConfigUI>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="switch" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
             </Field>
-			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false">
-				<Label>Enable status request / refresh button:</Label>
-			</Field>
 		</ConfigUI>
 		<States>
 			<State id="lastUpdated">
@@ -116,8 +117,9 @@
 	<Device type="sensor" id="HAbinarySensorType">
 		<Name>Home Assistant Binary Sensor</Name>
 		<ConfigUI>
-			<Field id="SupportsOnState" type="checkbox" defaultValue="true" hidden="true" />
 			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
+			<Field id="SupportsOnState"       type="checkbox" defaultValue="true"  hidden="true" />
+			<Field id="SupportsSensorValue"   type="checkbox" defaultValue="false" hidden="true" />
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="binary_sensor" dynamicReload="true"/>
@@ -136,8 +138,9 @@
 	<Device type="sensor" id="HAsensor">
 		<Name>Home Assistant Value Sensor</Name>
 		<ConfigUI>
-			<Field id="SupportsSensorValue" type="checkbox" defaultValue="true" hidden="true" />
 			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
+			<Field id="SupportsSensorValue"   type="checkbox" defaultValue="true"  hidden="true" />
+			<Field id="SupportsOnState"       type="checkbox" defaultValue="false" hidden="true" />
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>

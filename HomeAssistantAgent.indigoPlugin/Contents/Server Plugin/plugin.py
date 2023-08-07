@@ -183,7 +183,7 @@ class Plugin(indigo.PluginBase):
 
         elif device.deviceTypeId == "HAdimmerType":
             pass
-
+            
         elif device.deviceTypeId == "HAswitchType":
             pass
 
@@ -717,6 +717,7 @@ class Plugin(indigo.PluginBase):
                   'ios.notification_action_fired',
                   'mobile_app_notification_action',
                   'automation_reloaded',
+                  'data_entry_flow_progressed',
               ]):
             pass
 
