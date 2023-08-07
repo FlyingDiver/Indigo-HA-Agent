@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import indigo
-import requests
 import logging
 import json
 import threading
@@ -14,9 +13,9 @@ except ImportError:
     raise ImportError("'Required Python libraries missing.  Run 'pip3 install websocket-client zeroconf' in Terminal window, then reload plugin.")
 
 
-def updateVar(name, value, folder):
+def _update_indigo_var(name, value, folder):
     if name not in indigo.variables:
-        indigo.variable.create(name, value=value, folder=folder)
+        indigo.variable.create(name, value, folder)
     else:
         indigo.variable.updateValue(name, value)
 
@@ -90,6 +89,7 @@ class Plugin(indigo.PluginBase):
         self.server_port = None
         self.server_address = None
         self.ws = None
+        self.var_folder = None
         self.found_ha_servers = {}
         self.entity_devices = {}
         self.sent_messages = {}
@@ -120,10 +120,9 @@ class Plugin(indigo.PluginBase):
 
         # get the folder for the event variables
         if "HAA_Event" in indigo.variables.folders:
-            myFolder = indigo.variables.folders["HAA_Event"]
+            self.var_folder = indigo.variables.folders["HAA_Event"]
         else:
-            myFolder = indigo.variables.folder.create("HAA_Event")
-        self.pluginPrefs["folderId"] = myFolder.id
+            self.var_folder = indigo.variables.folder.create("HAA_Event")
 
     def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
@@ -195,7 +194,7 @@ class Plugin(indigo.PluginBase):
 
         device.replacePluginPropsOnServer(new_props)
         device.stateListOrDisplayStateIdChanged()
-        self.ha_entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
+        self.entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
 
     def deviceStopComm(self, device):
         self.logger.info(f"{device.name}: Stopping Agent device for entity '{device.address}'")
@@ -232,7 +231,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(f"menuChanged: typeId = {typeId}, devId = {devId}, valuesDict = {valuesDict}")
         return valuesDict
 
-    def ha_entity_update(self, entity_id, entity, force_update=False):
+    def entity_update(self, entity_id, entity, force_update=False):
         parts = entity_id.split('.')
 
         # check for deleted entity
@@ -394,98 +393,91 @@ class Plugin(indigo.PluginBase):
     ########################################
     # Relay/Dimmer Action methods
     ########################################
-    def actionControlDimmerRelay(self, action, dev):
-        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-        post_data = {"entity_id": dev.address}
-        self.logger.debug(f"{dev.name}: sending {action.deviceAction} to {dev.address}")
+    def actionControlDimmerRelay(self, action, device):
+        self.logger.debug(f"{device.name}: sending {action.deviceAction} to {device.address}")
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}}
 
-        if dev.deviceTypeId == "HAswitchType":
+        if device.deviceTypeId == "HAswitchType":
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                url = f"http://{self.server_address}:{self.server_port}/api/services/switch/turn_on"  # noqa
-                r = requests.post(url, headers=headers, json=post_data)
+                msg_data['domain'] = 'switch'
+                msg_data['service'] = 'turn_on'
+                self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                url = f"http://{self.server_address}:{self.server_port}/api/services/switch/turn_off"  # noqa
-                r = requests.post(url, headers=headers, json=post_data)
+                msg_data['domain'] = 'switch'
+                msg_data['service'] = 'turn_off'
+                self.send_ws(msg_data)
 
-        if dev.deviceTypeId == "HAdimmerType":
+            elif action.deviceAction == indigo.kDimmerRelayAction.Toggle:
+                msg_data['domain'] = 'switch'
+                msg_data['service'] = 'toggle'
+                self.send_ws(msg_data)
+
+        if device.deviceTypeId == "HAdimmerType":
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                url = f"http://{self.server_address}:{self.server_port}/api/services/light/turn_on"  # noqa
-                r = requests.post(url, headers=headers, json=post_data)
+                msg_data['domain'] = 'light'
+                msg_data['service'] = 'turn_on'
+                self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                url = f"http://{self.server_address}:{self.server_port}/api/services/light/turn_off"  # noqa
-                r = requests.post(url, headers=headers, json=post_data)
+                msg_data['domain'] = 'light'
+                msg_data['service'] = 'turn_off'
+                self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness:
-
-                url = f"http://{self.server_address}:{self.server_port}/api/services/light/turn_on"  # noqa
-                post_data = {"entity_id": dev.address, "brightness_pct": action.actionValue}
-                r = requests.post(url, headers=headers, json=post_data)
+                msg_data['domain'] = 'light'
+                msg_data['service'] = 'turn_on'
+                msg_data['service_data'] = {"brightness_pct": action.actionValue}
+                self.send_ws(msg_data)
 
     ########################################
     # Thermostat Action methods
     ########################################
-    def actionControlThermostat(self, action, dev):
-        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
+    def actionControlThermostat(self, action, device):
         if action.thermostatAction == indigo.kThermostatAction.SetHvacMode:
-            self._handleChangeHvacModeAction(dev, action.actionMode)
-
-        elif action.thermostatAction == indigo.kThermostatAction.SetFanMode:
-            self._handleChangeFanModeAction(dev, action.actionMode)
+            self.logger.debug(f"{device.name}: newHVACmode: {action.actionMode} ({_lookup_action_str_from_hvac_mode(action.actionMode)})")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_hvac_mode',
+                        'service_data': {"hvac_mode": _lookup_action_str_from_hvac_mode(action.actionMode)}}
+            self.send_ws(msg_data)
 
         elif action.thermostatAction == indigo.kThermostatAction.SetCoolSetpoint:
             newSetpoint = action.actionValue
-            self._handleChangeSetpointAction(dev, newSetpoint, "change cool setpoint", "setpointCool")
+            self._handleChangeSetpointAction(device, newSetpoint, "setpointCool")
 
         elif action.thermostatAction == indigo.kThermostatAction.SetHeatSetpoint:
             newSetpoint = action.actionValue
-            self._handleChangeSetpointAction(dev, newSetpoint, "change heat setpoint", "setpointHeat")
+            self._handleChangeSetpointAction(device, newSetpoint, "setpointHeat")
 
         elif action.thermostatAction == indigo.kThermostatAction.DecreaseCoolSetpoint:
-            newSetpoint = dev.coolSetpoint - action.actionValue
-            self._handleChangeSetpointAction(dev, newSetpoint, "decrease cool setpoint", "setpointCool")
+            newSetpoint = device.coolSetpoint - action.actionValue
+            self._handleChangeSetpointAction(device, newSetpoint, "setpointCool")
 
         elif action.thermostatAction == indigo.kThermostatAction.IncreaseCoolSetpoint:
-            newSetpoint = dev.coolSetpoint + action.actionValue
-            self._handleChangeSetpointAction(dev, newSetpoint, "increase cool setpoint", "setpointCool")
+            newSetpoint = device.coolSetpoint + action.actionValue
+            self._handleChangeSetpointAction(device, newSetpoint, "setpointCool")
 
         elif action.thermostatAction == indigo.kThermostatAction.DecreaseHeatSetpoint:
-            newSetpoint = dev.heatSetpoint - action.actionValue
-            self._handleChangeSetpointAction(dev, newSetpoint, "decrease heat setpoint", "setpointHeat")
+            newSetpoint = device.heatSetpoint - action.actionValue
+            self._handleChangeSetpointAction(device, newSetpoint, "setpointHeat")
 
         elif action.thermostatAction == indigo.kThermostatAction.IncreaseHeatSetpoint:
-            newSetpoint = dev.heatSetpoint + action.actionValue
-            self._handleChangeSetpointAction(dev, newSetpoint, "increase heat setpoint", "setpointHeat")
+            newSetpoint = device.heatSetpoint + action.actionValue
+            self._handleChangeSetpointAction(device, newSetpoint, "setpointHeat")
 
-    ######################
-    # Process action request from Indigo Server to change main thermostat's main mode.
-    def _handleChangeHvacModeAction(self, device, newHvacMode):
-        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-        self.logger.debug(f"{device.name}: newHVACmode: {newHvacMode} ({_lookup_action_str_from_hvac_mode(newHvacMode)})")
-
-        url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_hvac_mode"  # noqa
-        post_data = {"entity_id": device.address, "hvac_mode": _lookup_action_str_from_hvac_mode(newHvacMode)}
-        r = requests.post(url, headers=headers, json=post_data)
-
-    def _handleChangeFanModeAction(self, device, newFanMode):
-        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-        self.logger.debug(f"{device.name}: newFanMode: {newFanMode} ({_lookup_action_str_from_fan_mode(newFanMode)})")
-
-        url = f"http://{self.server_address}:{self.server_port}/api/services/fan/set_fan_mode"  # noqa
-        post_data = {"entity_id": device.address, "fan_mode": _lookup_action_str_from_fan_mode(newFanMode)}
-        r = requests.post(url, headers=headers, json=post_data)
+        elif action.thermostatAction == indigo.kThermostatAction.SetFanMode:
+            self.logger.debug(f"{device.name}: fanMode: {action.actionMode} ({_lookup_action_str_from_fan_mode(action.actionMode)})")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_fan_mode',
+                        'service_data': {"fan_mode": _lookup_action_str_from_fan_mode(action.actionMode)}}
+            self.send_ws(msg_data)
 
     ######################
     # Process action request from Indigo Server to change a cool/heat setpoint.
-    def _handleChangeSetpointAction(self, device, newSetpoint, logActionName, stateKey):
-        headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-
+    def _handleChangeSetpointAction(self, device, newSetpoint, stateKey):
         if stateKey in ["setpointCool", "setpointHeat"]:
-            url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_temperature"  # noqa
-            post_data = {"entity_id": device.address, "temperature": newSetpoint}
-            r = requests.post(url, headers=headers, json=post_data)
             self.logger.debug(f"{device.name}: _handleChangeSetpointAction: {stateKey} {newSetpoint:.1f}")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_temperature',
+                        'service_data': {"temperature": newSetpoint}}
+            self.send_ws(msg_data)
 
     ########################################
     # Plugin Menu object callbacks
@@ -496,7 +488,7 @@ class Plugin(indigo.PluginBase):
         return True
 
     def get_states(self):
-        self.send_ws('get_states')
+        self.send_ws({"type": 'get_states'})
         return True
 
     ########################################
@@ -522,11 +514,9 @@ class Plugin(indigo.PluginBase):
         mode = plugin_action.props.get("hvac_mode", None)
         self.logger.debug(f"{device.name}: set_hvac_mode_action: {mode} for {device.address}")
         if mode:
-            headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-            post_data = {"entity_id": device.address, "hvac_mode": mode}
-            url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_hvac_mode"  # noqa
-            r = requests.post(url, headers=headers, json=post_data)
-            self.logger.debug(f"{device.name}: {r.status_code} {r.reason}")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_hvac_mode',
+                        'service_data': {"hvac_mode": mode}}
+            self.send_ws(msg_data)
 
     def fan_mode_list(self, filter, values_dict, type_id, target_id):
         self.logger.debug(f"fan_mode_list: type_id = {type_id}, target_id = {target_id}")
@@ -547,11 +537,9 @@ class Plugin(indigo.PluginBase):
         mode = plugin_action.props.get("fan_mode", None)
         self.logger.debug(f"{device.name}: set_fan_mode_action: {mode} for {device.address}")
         if mode:
-            headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-            post_data = {"entity_id": device.address, "fan_mode": mode}
-            url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_fan_mode"  # noqa
-            r = requests.post(url, headers=headers, json=post_data)
-            self.logger.debug(f"{device.name}: {r.status_code} {r.reason}")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_fan_mode',
+                        'service_data': {"fan_mode": mode}}
+            self.send_ws(msg_data)
 
     def swing_mode_list(self, filter, values_dict, type_id, target_id):
         self.logger.debug(f"swing_mode_list: type_id = {type_id}, target_id = {target_id}")
@@ -572,11 +560,9 @@ class Plugin(indigo.PluginBase):
         mode = plugin_action.props.get("swing_mode", None)
         self.logger.debug(f"{device.name}: set_swing_mode_action: {mode} for {device.address}")
         if mode:
-            headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-            post_data = {"entity_id": device.address, "swing_mode": mode}
-            url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_swing_mode"  # noqa
-            r = requests.post(url, headers=headers, json=post_data)
-            self.logger.debug(f"{device.name}: {r.status_code} {r.reason}")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_swing_mode',
+                        'service_data': {"swing_mode": mode}}
+            self.send_ws(msg_data)
 
     def preset_mode_list(self, filter, values_dict, type_id, target_id):
         self.logger.debug(f"preset_mode_list: type_id = {type_id}, target_id = {target_id}")
@@ -597,21 +583,17 @@ class Plugin(indigo.PluginBase):
         mode = plugin_action.props.get("preset_mode", None)
         self.logger.debug(f"{device.name}: set_preset_mode_action: {mode} for {device.address}")
         if mode:
-            headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-            post_data = {"entity_id": device.address, "preset_mode": mode}
-            url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_preset_mode"  # noqa
-            r = requests.post(url, headers=headers, json=post_data)
-            self.logger.debug(f"{device.name}: {r.status_code} {r.reason}")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_preset_mode',
+                        'service_data': {"preset_mode": mode}}
+            self.send_ws(msg_data)
 
-    def set_humidity_action(self, plugin_action, device, callerWaitingForResult):
+    def set_humidityaction(self, plugin_action, device, callerWaitingForResult):
         humidity = plugin_action.props.get("humidity", None)
         self.logger.debug(f"{device.name}: set_humidity_action: {humidity} for {device.address}")
         if humidity:
-            headers = {'Authorization': f'Bearer {self.ha_token}', 'content-type': 'application/json'}
-            post_data = {"entity_id": device.address, "humidity": humidity}
-            url = f"http://{self.server_address}:{self.server_port}/api/services/climate/set_humidity"  # noqa
-            r = requests.post(url, headers=headers, json=post_data)
-            self.logger.debug(f"{device.name}: {r.status_code} {r.reason}")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_humidity',
+                        'service_data': {"humidity": humidity}}
+            self.send_ws(msg_data)
 
     ################################################################################
     # Minimal Websocket Client
@@ -640,24 +622,24 @@ class Plugin(indigo.PluginBase):
             self.logger.debug(f"Websocket got auth_ok for ha_version {msg['ha_version']}")
 
             # subscribe to events
-            self.send_ws('subscribe_events')
+            self.send_ws({"type": 'subscribe_events'})
 
             # get states to populate devices, and build a list of the current home assistant entities
-            self.send_ws('get_states')
+            self.send_ws({"type": 'get_states'})
 
         elif msg['type'] == 'auth_invalid':
             self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
 
         elif msg['type'] == 'result':
             if msg['id'] in self.sent_messages:
-                self.logger.debug(f"Websocket reply {'Success' if msg['success'] else 'Failed'} for {self.sent_messages[msg['id']]}")
-                if self.sent_messages[msg['id']] == "subscribe_events":
-                    pass
-
-                elif self.sent_messages[msg['id']] == "get_states":
-                    for entity in msg['result']:
-                        self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
-                        self.ha_entity_update(entity['entity_id'], entity, force_update=True)
+                self.logger.debug(f"Websocket reply {'Success' if msg['success'] else 'Failed'} for {self.sent_messages[msg['id']]['type']}")
+                if not msg['success']:
+                    self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
+                else:
+                    if self.sent_messages[msg['id']]['type'] == "get_states":
+                        for entity in msg['result']:
+                            self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
+                            self.entity_update(entity['entity_id'], entity, force_update=True)
                 del self.sent_messages[msg['id']]
 
             else:
@@ -665,7 +647,7 @@ class Plugin(indigo.PluginBase):
 
         elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'state_changed':
             try:
-                self.ha_entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
+                self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
             except Exception as e:
                 self.logger.error(f"Websocket state_changed exception: {e}")
                 self.logger.debug(f"Websocket state_changed:\n{msg}")
@@ -680,15 +662,16 @@ class Plugin(indigo.PluginBase):
                 f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
 
         elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'automation_triggered':
-            data = msg['event']['data']
+            event = msg['event']
+            data = event['data']
             self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
             self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
 
-            updateVar("event_id", data.get('entity_id', None), indigo.activePlugin.pluginPrefs["folderId"])
-            updateVar("event_type", msg['event'].get('event_type', None), indigo.activePlugin.pluginPrefs["folderId"])
-            updateVar("event_time", msg['event'].get('time_fired', None), indigo.activePlugin.pluginPrefs["folderId"])
-            updateVar("event_origin", msg['event'].get('origin', None), indigo.activePlugin.pluginPrefs["folderId"])
-            updateVar("event_name", data.get('name', None), indigo.activePlugin.pluginPrefs["folderId"])
+            _update_indigo_var("event_type",   event.get('event_type', None), self.var_folder)
+            _update_indigo_var("event_time",   event.get('time_fired', None), self.var_folder)
+            _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
+            _update_indigo_var("event_id",     data.get('entity_id', None), self.var_folder)
+            _update_indigo_var("event_name",   data.get('name', None), self.var_folder)
 
             for trigger in indigo.triggers.iter("self"):
                 if trigger.pluginTypeId == "automationEvent":
@@ -724,10 +707,11 @@ class Plugin(indigo.PluginBase):
         else:
             self.logger.warning(f"Websocket unknown message type: {json.dumps(msg)}")
 
-    def send_ws(self, msg=None):
+    def send_ws(self, msg_data):
         self.last_sent_id += 1
-        self.ws.send(json.dumps({'id': self.last_sent_id, 'type': msg}))
-        self.sent_messages[self.last_sent_id] = msg
+        msg_data['id'] = self.last_sent_id
+        self.ws.send(json.dumps(msg_data))
+        self.sent_messages[self.last_sent_id] = msg_data
 
     def on_close(self, ws, close_status_code, close_msg):
         self.logger.debug(f"Websocket on_close: {close_status_code} {close_msg}")
