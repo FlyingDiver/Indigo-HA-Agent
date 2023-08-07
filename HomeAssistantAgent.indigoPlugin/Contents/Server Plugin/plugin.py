@@ -13,9 +13,9 @@ except ImportError:
     raise ImportError("'Required Python libraries missing.  Run 'pip3 install websocket-client zeroconf' in Terminal window, then reload plugin.")
 
 
-def updateVar(name, value, folder):
+def _update_indigo_var(name, value, folder):
     if name not in indigo.variables:
-        indigo.variable.create(name, value=value, folder=folder)
+        indigo.variable.create(name, value, folder)
     else:
         indigo.variable.updateValue(name, value)
 
@@ -89,6 +89,7 @@ class Plugin(indigo.PluginBase):
         self.server_port = None
         self.server_address = None
         self.ws = None
+        self.var_folder = None
         self.found_ha_servers = {}
         self.entity_devices = {}
         self.sent_messages = {}
@@ -119,10 +120,9 @@ class Plugin(indigo.PluginBase):
 
         # get the folder for the event variables
         if "HAA_Event" in indigo.variables.folders:
-            myFolder = indigo.variables.folders["HAA_Event"]
+            self.var_folder = indigo.variables.folders["HAA_Event"]
         else:
-            myFolder = indigo.variables.folder.create("HAA_Event")
-        self.pluginPrefs["folderId"] = myFolder.id
+            self.var_folder = indigo.variables.folder.create("HAA_Event")
 
     def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
@@ -194,7 +194,7 @@ class Plugin(indigo.PluginBase):
 
         device.replacePluginPropsOnServer(new_props)
         device.stateListOrDisplayStateIdChanged()
-        self.ha_entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
+        self.entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
 
     def deviceStopComm(self, device):
         self.logger.info(f"{device.name}: Stopping Agent device for entity '{device.address}'")
@@ -231,7 +231,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(f"menuChanged: typeId = {typeId}, devId = {devId}, valuesDict = {valuesDict}")
         return valuesDict
 
-    def ha_entity_update(self, entity_id, entity, force_update=False):
+    def entity_update(self, entity_id, entity, force_update=False):
         parts = entity_id.split('.')
 
         # check for deleted entity
@@ -408,6 +408,11 @@ class Plugin(indigo.PluginBase):
                 msg_data['service'] = 'turn_off'
                 self.send_ws(msg_data)
 
+            elif action.deviceAction == indigo.kDimmerRelayAction.Toggle:
+                msg_data['domain'] = 'switch'
+                msg_data['service'] = 'toggle'
+                self.send_ws(msg_data)
+
         if device.deviceTypeId == "HAdimmerType":
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
                 msg_data['domain'] = 'light'
@@ -582,7 +587,7 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"preset_mode": mode}}
             self.send_ws(msg_data)
 
-    def set_humidity_action(self, plugin_action, device, callerWaitingForResult):
+    def set_humidityaction(self, plugin_action, device, callerWaitingForResult):
         humidity = plugin_action.props.get("humidity", None)
         self.logger.debug(f"{device.name}: set_humidity_action: {humidity} for {device.address}")
         if humidity:
@@ -627,14 +632,14 @@ class Plugin(indigo.PluginBase):
 
         elif msg['type'] == 'result':
             if msg['id'] in self.sent_messages:
-                self.logger.debug(f"Websocket reply {'Success' if msg['success'] else 'Failed'} for {self.sent_messages[msg['id']]}")
-                if self.sent_messages[msg['id']] == "subscribe_events":
-                    pass
-
-                elif self.sent_messages[msg['id']] == "get_states":
-                    for entity in msg['result']:
-                        self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
-                        self.ha_entity_update(entity['entity_id'], entity, force_update=True)
+                self.logger.debug(f"Websocket reply {'Success' if msg['success'] else 'Failed'} for {self.sent_messages[msg['id']]['type']}")
+                if not msg['success']:
+                    self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
+                else:
+                    if self.sent_messages[msg['id']]['type'] == "get_states":
+                        for entity in msg['result']:
+                            self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
+                            self.entity_update(entity['entity_id'], entity, force_update=True)
                 del self.sent_messages[msg['id']]
 
             else:
@@ -642,7 +647,7 @@ class Plugin(indigo.PluginBase):
 
         elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'state_changed':
             try:
-                self.ha_entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
+                self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
             except Exception as e:
                 self.logger.error(f"Websocket state_changed exception: {e}")
                 self.logger.debug(f"Websocket state_changed:\n{msg}")
@@ -657,15 +662,16 @@ class Plugin(indigo.PluginBase):
                 f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
 
         elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'automation_triggered':
-            data = msg['event']['data']
+            event = msg['event']
+            data = event['data']
             self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
             self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
 
-            updateVar("event_id", data.get('entity_id', None), indigo.activePlugin.pluginPrefs["folderId"])
-            updateVar("event_type", msg['event'].get('event_type', None), indigo.activePlugin.pluginPrefs["folderId"])
-            updateVar("event_time", msg['event'].get('time_fired', None), indigo.activePlugin.pluginPrefs["folderId"])
-            updateVar("event_origin", msg['event'].get('origin', None), indigo.activePlugin.pluginPrefs["folderId"])
-            updateVar("event_name", data.get('name', None), indigo.activePlugin.pluginPrefs["folderId"])
+            _update_indigo_var("event_type",   event.get('event_type', None), self.var_folder)
+            _update_indigo_var("event_time",   event.get('time_fired', None), self.var_folder)
+            _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
+            _update_indigo_var("event_id",     data.get('entity_id', None), self.var_folder)
+            _update_indigo_var("event_name",   data.get('name', None), self.var_folder)
 
             for trigger in indigo.triggers.iter("self"):
                 if trigger.pluginTypeId == "automationEvent":
@@ -705,7 +711,7 @@ class Plugin(indigo.PluginBase):
         self.last_sent_id += 1
         msg_data['id'] = self.last_sent_id
         self.ws.send(json.dumps(msg_data))
-        self.sent_messages[self.last_sent_id] = msg_data['type']
+        self.sent_messages[self.last_sent_id] = msg_data
 
     def on_close(self, ws, close_status_code, close_msg):
         self.logger.debug(f"Websocket on_close: {close_status_code} {close_msg}")
