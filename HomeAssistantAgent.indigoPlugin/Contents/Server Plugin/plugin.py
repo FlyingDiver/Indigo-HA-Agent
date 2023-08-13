@@ -587,7 +587,7 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"preset_mode": mode}}
             self.send_ws(msg_data)
 
-    def set_humidityaction(self, plugin_action, device, callerWaitingForResult):
+    def set_humidity_action(self, plugin_action, device, callerWaitingForResult):
         humidity = plugin_action.props.get("humidity", None)
         self.logger.debug(f"{device.name}: set_humidity_action: {humidity} for {device.address}")
         if humidity:
@@ -601,10 +601,16 @@ class Plugin(indigo.PluginBase):
     def ws_client(self, url):
         self.logger.debug(f"Connecting to '{url}'")
 
-        self.ws = websocket.WebSocketApp(url, on_open=self.on_open,
+        websocket.setdefaulttimeout(5)
+        try:
+            self.ws = websocket.WebSocketApp(url, on_open=self.on_open,
                                          on_message=self.on_message,
                                          on_error=self.on_error,
                                          on_close=self.on_close)
+        except Exception as err:
+            self.logger.error(f"Error connecting to '{url}': {err}")
+            return
+
         self.ws.run_forever(ping_interval=50, reconnect=5)
 
     def on_open(self, ws):
@@ -701,6 +707,7 @@ class Plugin(indigo.PluginBase):
                   'mobile_app_notification_action',
                   'automation_reloaded',
                   'data_entry_flow_progressed',
+                  'ultrasync_zone_update',
               ]):
             pass
 
