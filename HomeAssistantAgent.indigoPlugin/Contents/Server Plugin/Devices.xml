@@ -68,6 +68,11 @@
 				<TriggerLabel>lastUpdated</TriggerLabel>
 				<ControlPageLabel>lastUpdated</ControlPageLabel>
 			</State>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
+			</State>
 		</States>
 	</Device>
 
@@ -92,6 +97,11 @@
 				<TriggerLabel>lastUpdated</TriggerLabel>
 				<ControlPageLabel>lastUpdated</ControlPageLabel>
 			</State>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
+			</State>
 		</States>
 	</Device>
 
@@ -110,6 +120,11 @@
 				<ValueType>String</ValueType>
 				<TriggerLabel>lastUpdated</TriggerLabel>
 				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
 			</State>
 		</States>
 	</Device>
@@ -132,7 +147,11 @@
 				<TriggerLabel>lastUpdated</TriggerLabel>
 				<ControlPageLabel>lastUpdated</ControlPageLabel>
 			</State>
-		</States>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
+			</State>		</States>
 	</Device>
 
 	<Device type="sensor" id="HAsensor">
@@ -152,6 +171,11 @@
 				<ValueType>String</ValueType>
 				<TriggerLabel>lastUpdated</TriggerLabel>
 				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
 			</State>
 		</States>
 	</Device>

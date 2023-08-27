@@ -270,6 +270,7 @@ class Plugin(indigo.PluginBase):
                     {'key': "hvacOperationMode", 'value': _lookup_hvac_mode_from_action_str(entity["state"])},
                     {'key': "hvac_mode", 'value': entity["state"]},
                     {'key': "lastUpdated", 'value': entity["last_updated"]},
+                    {'key': "actual_state", 'value': entity["state"]}
                 ]
 
                 # HA setpoints are wonky
@@ -351,6 +352,8 @@ class Plugin(indigo.PluginBase):
                 else:
                     device.updateStateOnServer("onOffState", value=True)
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
                 if attributes.get('device_class', None) == 'occupancy':
                     device.updateStateImageOnServer(indigo.kStateImageSel.MotionSensor if isOff else indigo.kStateImageSel.MotionSensorTripped)
                 elif attributes.get('device_class', None) == 'problem':
@@ -363,18 +366,22 @@ class Plugin(indigo.PluginBase):
                 units = attributes.get("unit_of_measurement", "")
                 device.updateStateOnServer("sensorValue", value=entity["state"], uiValue=f"{entity['state']}{units}")
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
                 if attributes.get('device_class', None) == 'temperature':
                     device.updateStateImageOnServer(indigo.kStateImageSel.TemperatureSensor)
                 elif attributes.get('device_class', None) == 'humidity':
                     device.updateStateImageOnServer(indigo.kStateImageSel.HumiditySensor)
                 else:
                     device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+
         elif device.deviceTypeId == "HAswitchType":
             if entity["last_updated"] != device.states['lastUpdated']:
                 if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         elif device.deviceTypeId == "HAdimmerType":
@@ -385,6 +392,8 @@ class Plugin(indigo.PluginBase):
                     device.updateStateOnServer("onOffState", value=True)
                     brightness = attributes.get("brightness", 0) / 2.55
                     device.updateStateOnServer("brightnessLevel", value=round(brightness))
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         else:
