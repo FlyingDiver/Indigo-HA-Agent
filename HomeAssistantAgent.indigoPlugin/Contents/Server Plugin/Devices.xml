@@ -179,4 +179,34 @@
 			</State>
 		</States>
 	</Device>
+
+	<Device type="custom" id="ha_generic">
+		<Name>Home Assistant Generic Device</Name>
+		<ConfigUI>
+			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
+			<Field id="entity_type" type="menu">
+                <Label>Entity Type:</Label>
+                <List class="self" method="get_entity_type_list" filter="" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="generic" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+		</ConfigUI>
+		<States>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
+			</State>
+		</States>
+	</Device>
+
 </Devices>

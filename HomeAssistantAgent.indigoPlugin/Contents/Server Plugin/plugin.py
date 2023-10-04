@@ -157,8 +157,9 @@ class Plugin(indigo.PluginBase):
             return
 
         # check the attributes for the device and update the Indigo device definition
-        new_props = device.pluginProps
         if device.deviceTypeId == "HAclimate":
+            new_props = device.pluginProps
+
             if entity['attributes'].get('current_temperature', None):
                 new_props["NumTemperatureInputs"] = 1
             else:
@@ -180,25 +181,20 @@ class Plugin(indigo.PluginBase):
             if 'cool' in entity['attributes']['hvac_modes']:
                 new_props["SupportsCoolSetpoint"] = True
 
-        elif device.deviceTypeId == "HAdimmerType":
-            pass
-            
-        elif device.deviceTypeId == "HAswitchType":
-            pass
+            device.replacePluginPropsOnServer(new_props)
 
-        elif device.deviceTypeId == "HAbinarySensorType":
-            pass
-
-        elif device.deviceTypeId == "HAsensor":
-            pass
-
-        device.replacePluginPropsOnServer(new_props)
         device.stateListOrDisplayStateIdChanged()
         self.entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
 
     def deviceStopComm(self, device):
         self.logger.info(f"{device.name}: Stopping Agent device for entity '{device.address}'")
         del self.entity_devices[device.address]
+
+    @staticmethod
+    def didDeviceCommPropertyChange(oldDevice, newDevice):
+        if oldDevice.address != newDevice.address:
+            return True
+        return False
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
@@ -219,17 +215,43 @@ class Plugin(indigo.PluginBase):
         valuesDict['port'] = data['port']
         return valuesDict
 
-    def get_entity_list(self, filter="", valuesDict=None, typeId="", targetId=0):
+    def get_entity_type_list(self, filter="", valuesDict=None, typeId="", targetId=0):
+        self.logger.debug(f"get_entity_type_list: {filter = }, {typeId = }, {valuesDict = }, {targetId = }")
+
         retList = []
+        for entity_type, entity_list in self.ha_entity_map.items():
+            retList.append((entity_type, entity_type))
+        retList.sort(key=lambda tup: tup[1])
+        self.logger.debug(f"get_entity_type_list: {retList = }")
+        return retList
+
+    def get_entity_list(self, filter="", valuesDict=None, typeId="", targetId=0):
+        self.logger.debug(f"get_entity_list: {filter = }, {typeId = }, {valuesDict = }, {targetId = }")
+        if filter == "generic":
+            filter = valuesDict.get('entity_type', None)
+
+        retList = []
+        if not filter:
+            return retList
+
         for entity_name, entity in self.ha_entity_map[filter].items():
             retList.append((entity['entity_id'], entity_name))
         retList.sort(key=lambda tup: tup[1])
-        self.logger.debug(f"get_entity_list for filter '{filter}': retList = {retList}")
+        self.logger.debug(f"get_entity_list for filter '{filter}': {retList = }")
         return retList
 
     def menuChanged(self, valuesDict, typeId, devId):
-        self.logger.debug(f"menuChanged: typeId = {typeId}, devId = {devId}, valuesDict = {valuesDict}")
+        self.logger.debug(f"menuChanged: {typeId = }, {devId = }, {valuesDict = }")
         return valuesDict
+
+    def getDeviceStateList(self, device):
+        stateList = indigo.PluginBase.getDeviceStateList(self, device)
+        add_states = device.pluginProps.get("states_list", indigo.List())
+        for key in add_states:
+            new_state = self.getDeviceStateDictForStringType(str(key), str(key), str(key))
+            stateList.append(new_state)
+        self.logger.threaddebug(f"{device.name}: getDeviceStateList returning: {stateList}")
+        return stateList
 
     def entity_update(self, entity_id, entity, force_update=False):
         parts = entity_id.split('.')
@@ -263,6 +285,30 @@ class Plugin(indigo.PluginBase):
             return
 
         self.logger.debug(f"Updating device {device.name} with {entity}")
+
+        states_list = []
+        old_states = device.pluginProps.get("states_list", indigo.List())
+        new_states = indigo.List()
+        for key in attributes:
+            if attributes[key] is not None:
+                self.logger.threaddebug(f"{device.name}: adding to states_list: {key}, {attributes[key]}, {type(attributes[key])}")
+                new_states.append(key)
+                if type(attributes[key]) in (int, bool, str):
+                    states_list.append({'key': key, 'value': attributes[key]})
+                elif type(attributes[key]) is float:
+                    states_list.append({'key': key, 'value': attributes[key], 'decimalPlaces': 2})
+                else:
+                    states_list.append({'key': key, 'value': json.dumps(attributes[key])})
+
+        if set(old_states) != set(new_states):
+            self.logger.debug(f"{device.name}: states list changed, updating...")
+            newProps = device.pluginProps
+            newProps["states_list"] = new_states
+            device.replacePluginPropsOnServer(newProps)
+            device.stateListOrDisplayStateIdChanged()
+            self.sleep(1.0)
+        device.updateStatesOnServer(states_list)
+
         if device.deviceTypeId == "HAclimate":
 
             if entity["last_updated"] != device.states['lastUpdated']:
@@ -395,6 +441,11 @@ class Plugin(indigo.PluginBase):
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateOnServer("actual_state", value=entity["state"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+
+        elif device.deviceTypeId == "ha_generic":
+            device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+            device.updateStateOnServer("actual_state", value=entity["state"])
+            device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         else:
             self.logger.error(f"{device.name}: Unknown device type: {device.deviceTypeId}")
