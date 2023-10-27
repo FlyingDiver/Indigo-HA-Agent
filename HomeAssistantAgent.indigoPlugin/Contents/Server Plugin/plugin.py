@@ -19,6 +19,12 @@ def _update_indigo_var(name, value, folder):
     else:
         indigo.variable.updateValue(name, value)
 
+def is_number(input_str):
+    try:
+        float(input_str)
+        return True
+    except ValueError:
+        return False
 
 ################################################################################
 
@@ -392,8 +398,7 @@ class Plugin(indigo.PluginBase):
 
         elif device.deviceTypeId == "HAbinarySensorType":
             if entity["last_updated"] != device.states['lastUpdated']:
-                isOff = entity["state"] == 'off'
-                if isOff:
+                if isOff := entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
@@ -410,7 +415,12 @@ class Plugin(indigo.PluginBase):
         elif device.deviceTypeId == "HAsensor":
             if entity["last_updated"] != device.states['lastUpdated']:
                 units = attributes.get("unit_of_measurement", "")
-                device.updateStateOnServer("sensorValue", value=entity["state"], uiValue=f"{entity['state']}{units}")
+                state_value = entity["state"]
+                if is_number(state_value):
+                    device.updateStateOnServer("sensorValue", value=state_value, uiValue=f"{state_value}{units}")
+                else:
+                    self.logger.threaddebug(f"do_update: forcing value to 0.0 for : {device.name}")
+                    device.updateStateOnServer("sensorValue", value=0.0, uiValue=state_value)
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateOnServer("actual_state", value=entity["state"])
                 if attributes.get('device_class', None) == 'temperature':
@@ -762,12 +772,14 @@ class Plugin(indigo.PluginBase):
                   'panels_updated',
                   'area_registry_updated',
                   'ios.became_active',
+                  'ios.finished_launching',
                   'ios.entered_background',
                   'ios.notification_action_fired',
                   'mobile_app_notification_action',
                   'automation_reloaded',
                   'data_entry_flow_progressed',
                   'ultrasync_zone_update',
+                  'insteon.button_on',
               ]):
             pass
 
