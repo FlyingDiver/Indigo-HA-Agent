@@ -180,6 +180,36 @@
 		</States>
 	</Device>
 
+	<Device type="relay" id="ha_cover">
+		<Name>Home Assistant Cover</Name>
+		<ConfigUI>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsSetPosition" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsStop" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsOpenTilt" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsCloseTilt" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsSetTilt" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsStopTilt" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="cover" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+			</Field>
+		</ConfigUI>
+		<States>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
+			</State>
+		</States>
+	</Device>
+
 	<Device type="custom" id="ha_generic">
 		<Name>Home Assistant Generic Device</Name>
 		<ConfigUI>

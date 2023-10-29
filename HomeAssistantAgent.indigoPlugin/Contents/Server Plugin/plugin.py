@@ -5,12 +5,13 @@ import indigo
 import logging
 import json
 import threading
+import websocket
+from enum import IntFlag
 
 try:
-    import websocket
     from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
 except ImportError:
-    raise ImportError("'Required Python libraries missing.  Run 'pip3 install websocket-client zeroconf' in Terminal window, then reload plugin.")
+    raise ImportError("'Required Python libraries missing.  Run 'pip3 install zeroconf' in Terminal window, then reload plugin.")
 
 
 def _update_indigo_var(name, value, folder):
@@ -75,6 +76,33 @@ def _lookup_hvac_mode_from_action_str(hvac_mode):
 def _lookup_fan_mode_from_action_str(fan_mode):
     return FAN_MODE_STR_TO_ENUM_MAP.get(fan_mode.lower(), indigo.kFanMode.Auto)
 
+# Home Assistant Features
+class CoverEntityFeature(IntFlag):
+    """Supported features of the cover entity."""
+    OPEN = 1
+    CLOSE = 2
+    SET_POSITION = 4
+    STOP = 8
+    OPEN_TILT = 16
+    CLOSE_TILT = 32
+    STOP_TILT = 64
+    SET_TILT_POSITION = 128
+
+class ClimateEntityFeature(IntFlag):
+    """Supported features of the climate entity."""
+    TARGET_TEMPERATURE = 1
+    TARGET_TEMPERATURE_RANGE = 2
+    TARGET_HUMIDITY = 4
+    FAN_MODE = 8
+    PRESET_MODE = 16
+    SWING_MODE = 32
+    AUX_HEAT = 64
+
+class LightEntityFeature(IntFlag):
+    """Supported features of the light entity."""
+    EFFECT = 4
+    FLASH = 8
+    TRANSITION = 32
 
 ################################################################################
 
@@ -186,6 +214,25 @@ class Plugin(indigo.PluginBase):
 
             if 'cool' in entity['attributes']['hvac_modes']:
                 new_props["SupportsCoolSetpoint"] = True
+
+            device.replacePluginPropsOnServer(new_props)
+
+        elif device.deviceTypeId == "ha_cover":
+            features = entity['attributes'].get('supported_features', 0)
+
+            new_props = device.pluginProps
+            if features & CoverEntityFeature.SET_POSITION:
+                new_props["SupportsSetPosition"] = True
+            if features & CoverEntityFeature.STOP:
+                new_props["SupportsStop"] = True
+            if features & CoverEntityFeature.OPEN_TILT:
+                new_props["SupportsOpenTilt"] = True
+            if features & CoverEntityFeature.CLOSE_TILT:
+                new_props["SupportsCloseTilt"] = True
+            if features & CoverEntityFeature.STOP_TILT:
+                new_props["SupportsStopTilt"] = True
+            if features & CoverEntityFeature.SET_TILT_POSITION:
+                new_props["SupportsSetTiltPosition"] = True
 
             device.replacePluginPropsOnServer(new_props)
 
@@ -446,8 +493,18 @@ class Plugin(indigo.PluginBase):
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
-                    brightness = attributes.get("brightness", 0) / 2.55
-                    device.updateStateOnServer("brightnessLevel", value=round(brightness))
+                    position = attributes.get("position", 0)
+                    device.updateStateOnServer("brightnessLevel", value=round(position))
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
+                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+
+        elif device.deviceTypeId == "ha_cover":
+            if entity["last_updated"] != device.states['lastUpdated']:
+                if entity["state"] == 'closed':
+                    device.updateStateOnServer("onOffState", value=False, uiValue="Closed")
+                else:
+                    device.updateStateOnServer("onOffState", value=True, uiValue=entity["state"].capitalize())
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateOnServer("actual_state", value=entity["state"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
@@ -498,6 +555,17 @@ class Plugin(indigo.PluginBase):
                 msg_data['domain'] = 'light'
                 msg_data['service'] = 'turn_on'
                 msg_data['service_data'] = {"brightness_pct": action.actionValue}
+                self.send_ws(msg_data)
+
+        if device.deviceTypeId == "ha_cover":
+            if action.deviceAction == indigo.kDeviceAction.TurnOn:
+                msg_data['domain'] = 'cover'
+                msg_data['service'] = 'open_cover'
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
+                msg_data['domain'] = 'cover'
+                msg_data['service'] = 'close_cover'
                 self.send_ws(msg_data)
 
     ########################################
@@ -665,11 +733,55 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"humidity": humidity}}
             self.send_ws(msg_data)
 
+    #   Cover entity actions
+
+    def set_cover_position_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: set_cover_position_action for {device.address}")
+        if not device.pluginProps.get("SupportsSetPosition", None):
+            self.logger.warning(f"{device.name}: set_cover_position_action: {device.address} does not support set cover position")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover',
+                    'service': 'set_cover_position', 'service_data': {"position": plugin_action.props.get("cover_position", 0)}}
+        self.send_ws(msg_data)
+
+    def stop_cover_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: stop_cover_action for {device.address}")
+        if not device.pluginProps.get("SupportsStop", None):
+            self.logger.warning(f"{device.name}: stop_cover_action: {device.address} does not support stop cover")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover', 'service': 'stop_cover'}
+        self.send_ws(msg_data)
+
+    def open_cover_tilt_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: open_cover_tilt_action for {device.address}")
+        if not device.pluginProps.get("SupportsOpenTilt", None):
+            self.logger.warning(f"{device.name}: open_cover_tilt_action: {device.address} does not support open tilt")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover', 'service': 'open_cover_tilt'}
+        self.send_ws(msg_data)
+
+    def close_cover_tilt_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: close_cover_tilt_action for {device.address}")
+        if not device.pluginProps.get("SupportsCloseTilt", None):
+            self.logger.warning(f"{device.name}: close_cover_tilt_action: {device.address} does not support close tilt")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover', 'service': 'close_cover_tilt'}
+        self.send_ws(msg_data)
+
+    def set_cover_tilt_position_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: set_cover_tilt_position_action for {device.address}")
+        if not device.pluginProps.get("SupportsSetTiltPosition", None):
+            self.logger.warning(f"{device.name}: set_cover_tilt_position_action: {device.address} does not support set tilt")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover',
+                    'service': 'set_cover_tilt_position', 'service_data': {"position": plugin_action.props.get("tilt_position", 0)}}
+        self.send_ws(msg_data)
+
     ################################################################################
     # Minimal Websocket Client
     ################################################################################
     def ws_client(self, url):
-        self.logger.debug(f"Connecting to '{url}'")
+        self.logger.debug(f"Attempting connection to '{url}'")
 
         websocket.setdefaulttimeout(5)
         try:
@@ -684,7 +796,7 @@ class Plugin(indigo.PluginBase):
         self.ws.run_forever(ping_interval=50, reconnect=5)
 
     def on_open(self, ws):
-        self.logger.debug(f"Websocket connected")
+        self.logger.debug(f"Websocket connection successful")
 
     def on_message(self, ws, message):
         self.logger.threaddebug(f"Websocket on_message: {message}")
@@ -793,7 +905,7 @@ class Plugin(indigo.PluginBase):
         self.sent_messages[self.last_sent_id] = msg_data
 
     def on_close(self, ws, close_status_code, close_msg):
-        self.logger.debug(f"Websocket on_close: {close_status_code} {close_msg}")
+        self.logger.debug(f"Websocket closed: {close_status_code} {close_msg}")
 
     def on_error(self, ws, error):
-        self.logger.debug(f"Websocket on_error: {error}")
+        self.logger.debug(f"Websocket error: {error}")
