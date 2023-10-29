@@ -49,4 +49,35 @@
             </Field>
         </ConfigUI>
     </Action>
+    <Action id="sep3" />
+    <Action id="set_cover_position" deviceFilter="self.ha_cover">
+        <Name>Set Cover Position</Name>
+        <CallbackMethod>set_cover_position_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="cover_position" type="textfield" default="0">
+                <Label>Cover Position (%):</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="stop_cover" deviceFilter="self.ha_cover">
+        <Name>Stop Cover Movement</Name>
+        <CallbackMethod>stop_cover_action</CallbackMethod>
+    </Action>
+    <Action id="open_cover_tilt" deviceFilter="self.ha_cover">
+        <Name>Open Cover Tilt</Name>
+        <CallbackMethod>open_cover_tilt_action</CallbackMethod>
+    </Action>
+    <Action id="close_cover_tilt" deviceFilter="self.ha_cover">
+        <Name>Close Cover Tilt</Name>
+        <CallbackMethod>close_cover_tilt_action</CallbackMethod>
+    </Action>
+    <Action id="set_cover_tilt" deviceFilter="self.ha_cover">
+        <Name>Set Cover Tilt</Name>
+        <CallbackMethod>set_cover_tilt_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="tilt_position" type="textfield" default="0">
+                <Label>Tilt Position (%):</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
 </Actions>
