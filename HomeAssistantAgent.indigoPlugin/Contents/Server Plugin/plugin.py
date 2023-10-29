@@ -104,6 +104,13 @@ class LightEntityFeature(IntFlag):
     FLASH = 8
     TRANSITION = 32
 
+class FanEntityFeature(IntFlag):
+    """Supported features of the fan entity."""
+    SET_SPEED = 1
+    OSCILLATE = 2
+    DIRECTION = 4
+    PRESET_MODE = 8
+
 ################################################################################
 
 class Plugin(indigo.PluginBase):
@@ -190,37 +197,25 @@ class Plugin(indigo.PluginBase):
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return
 
+        new_props = device.pluginProps
+        features = entity['attributes'].get('supported_features', 0)
+
         # check the attributes for the device and update the Indigo device definition
         if device.deviceTypeId == "HAclimate":
-            new_props = device.pluginProps
 
-            if entity['attributes'].get('current_temperature', None):
+            if features & ClimateEntityFeature.TARGET_TEMPERATURE:
                 new_props["NumTemperatureInputs"] = 1
-            else:
-                new_props["NumTemperatureInputs"] = 0
-
-            if entity['attributes'].get('current_humidity', None):
+            if features & ClimateEntityFeature.TARGET_HUMIDITY:
                 new_props["NumHumidityInputs"] = 1
-            else:
-                new_props["NumHumidityInputs"] = 0
-
-            if entity['attributes'].get('fan_mode', None):
+            if features & ClimateEntityFeature.FAN_MODE:
                 new_props["SupportsHvacFanMode"] = True
-            else:
-                new_props["SupportsHvacFanMode"] = False
-
             if 'heat' in entity['attributes']['hvac_modes']:
                 new_props["SupportsHeatSetpoint"] = True
-
             if 'cool' in entity['attributes']['hvac_modes']:
                 new_props["SupportsCoolSetpoint"] = True
 
-            device.replacePluginPropsOnServer(new_props)
-
         elif device.deviceTypeId == "ha_cover":
-            features = entity['attributes'].get('supported_features', 0)
 
-            new_props = device.pluginProps
             if features & CoverEntityFeature.SET_POSITION:
                 new_props["SupportsSetPosition"] = True
             if features & CoverEntityFeature.STOP:
@@ -234,8 +229,18 @@ class Plugin(indigo.PluginBase):
             if features & CoverEntityFeature.SET_TILT_POSITION:
                 new_props["SupportsSetTiltPosition"] = True
 
-            device.replacePluginPropsOnServer(new_props)
+        elif device.deviceTypeId == "ha_fan":
 
+            if features & FanEntityFeature.DIRECTION:
+                new_props["SupportsSetDirection"] = True
+            if features & FanEntityFeature.OSCILLATE:
+                new_props["SupportsOscillate"] = True
+            if features & FanEntityFeature.PRESET_MODE:
+                new_props["SupportsFanPresetMode"] = True
+            if features & FanEntityFeature.SET_SPEED:
+                new_props["SupportsFanSpeed"] = True
+
+        device.replacePluginPropsOnServer(new_props)
         device.stateListOrDisplayStateIdChanged()
         self.entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
 
@@ -273,7 +278,8 @@ class Plugin(indigo.PluginBase):
 
         retList = []
         for entity_type, entity_list in self.ha_entity_map.items():
-            retList.append((entity_type, entity_type))
+            if entity_type not in ['climate', 'cover', 'light', 'sensor', 'switch', 'binary_sensor']:
+                retList.append((entity_type, entity_type))
         retList.sort(key=lambda tup: tup[1])
         self.logger.debug(f"get_entity_type_list: {retList = }")
         return retList
@@ -343,15 +349,14 @@ class Plugin(indigo.PluginBase):
         old_states = device.pluginProps.get("states_list", indigo.List())
         new_states = indigo.List()
         for key in attributes:
-            if attributes[key] is not None:
-                self.logger.threaddebug(f"{device.name}: adding to states_list: {key}, {attributes[key]}, {type(attributes[key])}")
-                new_states.append(key)
-                if type(attributes[key]) in (int, bool, str):
-                    states_list.append({'key': key, 'value': attributes[key]})
-                elif type(attributes[key]) is float:
-                    states_list.append({'key': key, 'value': attributes[key], 'decimalPlaces': 2})
-                else:
-                    states_list.append({'key': key, 'value': json.dumps(attributes[key])})
+            self.logger.threaddebug(f"{device.name}: adding to states_list: {key}, {attributes[key]}, {type(attributes[key])}")
+            new_states.append(key)
+            if type(attributes[key]) in (int, bool, str):
+                states_list.append({'key': key, 'value': attributes[key]})
+            elif type(attributes[key]) is float:
+                states_list.append({'key': key, 'value': attributes[key], 'decimalPlaces': 2})
+            else:
+                states_list.append({'key': key, 'value': json.dumps(attributes[key])})
 
         if set(old_states) != set(new_states):
             self.logger.debug(f"{device.name}: states list changed, updating...")
@@ -509,13 +514,27 @@ class Plugin(indigo.PluginBase):
                 device.updateStateOnServer("actual_state", value=entity["state"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
+        elif device.deviceTypeId == "ha_fan":
+            speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
+            if entity["last_updated"] != device.states['lastUpdated']:
+                if entity["state"] == 'off':
+                    device.updateStateOnServer("onOffState", value=False, uiValue="Off")
+                else:
+                    speed_percentage = attributes.get("percentage", 0)
+                    speed_index = round(speed_percentage / speed_index_scale_factor)
+                    device.updateStateOnServer("onOffState", value=True, uiValue="On")
+                    device.updateStateOnServer("speedIndex", speed_index)
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
+                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+
         elif device.deviceTypeId == "ha_generic":
             device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
             device.updateStateOnServer("actual_state", value=entity["state"])
             device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         else:
-            self.logger.error(f"{device.name}: Unknown device type: {device.deviceTypeId}")
+            self.logger.error(f"{device.name}: Unknown device type: {device.deviceTypeId} in entity_update()")
 
     ########################################
     # Relay/Dimmer Action methods
@@ -525,46 +544,41 @@ class Plugin(indigo.PluginBase):
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}}
 
         if device.deviceTypeId == "HAswitchType":
+            msg_data['domain'] = 'switch'
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                msg_data['domain'] = 'switch'
                 msg_data['service'] = 'turn_on'
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                msg_data['domain'] = 'switch'
                 msg_data['service'] = 'turn_off'
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.Toggle:
-                msg_data['domain'] = 'switch'
                 msg_data['service'] = 'toggle'
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "HAdimmerType":
+            msg_data['domain'] = 'light'
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                msg_data['domain'] = 'light'
                 msg_data['service'] = 'turn_on'
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                msg_data['domain'] = 'light'
                 msg_data['service'] = 'turn_off'
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness:
-                msg_data['domain'] = 'light'
                 msg_data['service'] = 'turn_on'
                 msg_data['service_data'] = {"brightness_pct": action.actionValue}
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "ha_cover":
+            msg_data['domain'] = 'cover'
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                msg_data['domain'] = 'cover'
                 msg_data['service'] = 'open_cover'
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                msg_data['domain'] = 'cover'
                 msg_data['service'] = 'close_cover'
                 self.send_ws(msg_data)
 
@@ -608,7 +622,49 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"fan_mode": _lookup_action_str_from_fan_mode(action.actionMode)}}
             self.send_ws(msg_data)
 
+    ########################################
+    # Speed Control Action callbacks
     ######################
+    def actionControlSpeedControl(self, action, device):
+        self.logger.debug(f"{device.name}: sending {action.speedControlAction} {action.actionValue} to {device.address}")
+        msg_data = {"type": "call_service", "domain": 'fan', "target": {"entity_id": device.address}}
+        speed_index_scale_factor = int(100 / (device.speedIndexCount -1))
+
+        if action.speedControlAction == indigo.kSpeedControlAction.TurnOn:
+            msg_data['service'] = 'turn_on'
+            self.send_ws(msg_data)
+
+        elif action.speedControlAction == indigo.kSpeedControlAction.TurnOff:
+            msg_data['service'] = 'turn_off'
+            self.send_ws(msg_data)
+
+        elif action.speedControlAction == indigo.kSpeedControlAction.Toggle:
+            msg_data['service'] = 'turn_off' if device.onState else 'turn_on'
+            self.send_ws(msg_data)
+
+        elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedLevel:
+            msg_data['service'] = 'set_percentage'
+            msg_data['service_data'] = {"percentage": action.actionValue}
+            self.send_ws(msg_data)
+
+        elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedIndex:
+            msg_data['service'] = 'set_percentage'
+            msg_data['service_data'] = {"percentage": str(int(action.actionValue) * speed_index_scale_factor)}
+            self.send_ws(msg_data)
+
+        elif action.speedControlAction == indigo.kSpeedControlAction.IncreaseSpeedIndex:
+            speedIndex = min(device.speedIndex + 1, device.speedIndexCount - 1)
+            msg_data['service'] = 'set_percentage'
+            msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
+            self.send_ws(msg_data)
+
+        elif action.speedControlAction == indigo.kSpeedControlAction.DecreaseSpeedIndex:
+            speedIndex = max(device.speedIndex - 1, 0)
+            msg_data['service'] = 'set_percentage'
+            msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
+            self.send_ws(msg_data)
+        self.logger.debug(f"{device.name}: sent {msg_data} to {device.address}")
+
     # Process action request from Indigo Server to change a cool/heat setpoint.
     def _handleChangeSetpointAction(self, device, newSetpoint, stateKey):
         if stateKey in ["setpointCool", "setpointHeat"]:
@@ -656,7 +712,7 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"hvac_mode": mode}}
             self.send_ws(msg_data)
 
-    def fan_mode_list(self, filter, values_dict, type_id, target_id):
+    def hvac_fan_mode_list(self, filter, values_dict, type_id, target_id):
         self.logger.debug(f"fan_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
@@ -671,7 +727,7 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def set_fan_mode_action(self, plugin_action, device, callerWaitingForResult):
+    def set_hvac_fan_mode_action(self, plugin_action, device, callerWaitingForResult):
         mode = plugin_action.props.get("fan_mode", None)
         self.logger.debug(f"{device.name}: set_fan_mode_action: {mode} for {device.address}")
         if mode:
@@ -679,7 +735,7 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"fan_mode": mode}}
             self.send_ws(msg_data)
 
-    def swing_mode_list(self, filter, values_dict, type_id, target_id):
+    def hvac_swing_mode_list(self, filter, values_dict, type_id, target_id):
         self.logger.debug(f"swing_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
@@ -694,15 +750,15 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def set_swing_mode_action(self, plugin_action, device, callerWaitingForResult):
-        mode = plugin_action.props.get("swing_mode", None)
-        self.logger.debug(f"{device.name}: set_swing_mode_action: {mode} for {device.address}")
+    def set_hvac_swing_mode_action(self, plugin_action, device, callerWaitingForResult):
+        mode = plugin_action.props.get("hvac_swing_mode", None)
+        self.logger.debug(f"{device.name}: set_hvac_swing_mode_action: {mode} for {device.address}")
         if mode:
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_swing_mode',
                         'service_data': {"swing_mode": mode}}
             self.send_ws(msg_data)
 
-    def preset_mode_list(self, filter, values_dict, type_id, target_id):
+    def hvac_preset_mode_list(self, filter, values_dict, type_id, target_id):
         self.logger.debug(f"preset_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
@@ -717,16 +773,16 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def set_preset_mode_action(self, plugin_action, device, callerWaitingForResult):
-        mode = plugin_action.props.get("preset_mode", None)
-        self.logger.debug(f"{device.name}: set_preset_mode_action: {mode} for {device.address}")
+    def set_hvac_preset_mode_action(self, plugin_action, device, callerWaitingForResult):
+        mode = plugin_action.props.get("hvac_preset_mode", None)
+        self.logger.debug(f"{device.name}: set_hvac_preset_mode_action: {mode} for {device.address}")
         if mode:
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_preset_mode',
                         'service_data': {"preset_mode": mode}}
             self.send_ws(msg_data)
 
     def set_humidity_action(self, plugin_action, device, callerWaitingForResult):
-        humidity = plugin_action.props.get("humidity", None)
+        humidity = plugin_action.props.get("hvac_humidity", None)
         self.logger.debug(f"{device.name}: set_humidity_action: {humidity} for {device.address}")
         if humidity:
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_humidity',
@@ -775,6 +831,26 @@ class Plugin(indigo.PluginBase):
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover',
                     'service': 'set_cover_tilt_position', 'service_data': {"position": plugin_action.props.get("tilt_position", 0)}}
+        self.send_ws(msg_data)
+
+    #   Fan entity actions
+
+    def set_fan_direction_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: set_fan_direction_action for {device.address}")
+        if not device.pluginProps.get("SupportsSetDirection", None):
+            self.logger.warning(f"{device.name}: set_fan_direction_action: {device.address} does not support set fan direction")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'fan',
+                    'service': 'set_direction', 'service_data': {"direction": plugin_action.props.get("direction", 0)}}
+        self.send_ws(msg_data)
+
+    def set_fan_oscillate_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: set_fan_oscillate_action for {device.address}")
+        if not device.pluginProps.get("SupportsOscillate", None):
+            self.logger.warning(f"{device.name}: set_fan_oscillate_action: {device.address} does not support oscillate")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'fan',
+                    'service': 'oscillate', 'service_data': {"oscillating": bool(int(plugin_action.props.get("oscillate", 0)))}}
         self.send_ws(msg_data)
 
     ################################################################################

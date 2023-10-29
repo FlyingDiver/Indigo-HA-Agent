@@ -10,33 +10,33 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="set_fan_mode" deviceFilter="self.HAclimate">
+    <Action id="set_hvac_fan_mode" deviceFilter="self.HAclimate">
         <Name>Set Fan Mode</Name>
-        <CallbackMethod>set_fan_mode_action</CallbackMethod>
+        <CallbackMethod>set_hvac_fan_mode_action</CallbackMethod>
         <ConfigUI>
             <Field id="fan_mode" type="menu">
                 <Label>Fan Mode:</Label>
-                 <List class="self" filter="" method="fan_mode_list" dynamicReload="true"/>
+                 <List class="self" filter="" method="hvac_fan_mode_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="set_swing_mode" deviceFilter="self.HAclimate">
+    <Action id="set_hvac_swing_mode" deviceFilter="self.HAclimate">
         <Name>Set Swing Mode</Name>
-        <CallbackMethod>set_swing_mode_action</CallbackMethod>
+        <CallbackMethod>set_hvac_swing_mode_action</CallbackMethod>
         <ConfigUI>
-            <Field id="swing_mode" type="menu">
+            <Field id="hvac_swing_mode" type="menu">
                 <Label>Swing Mode:</Label>
-                 <List class="self" filter="" method="swing_mode_list" dynamicReload="true"/>
+                 <List class="self" filter="" method="hvac_swing_mode_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="set_preset_mode" deviceFilter="self.HAclimate">
+    <Action id="set_hvac_preset_mode" deviceFilter="self.HAclimate">
         <Name>Set Preset Mode</Name>
-        <CallbackMethod>set_preset_mode_action</CallbackMethod>
+        <CallbackMethod>set_hvac_preset_mode_action</CallbackMethod>
         <ConfigUI>
-            <Field id="preset_mode" type="menu">
+            <Field id="hvac_preset_mode" type="menu">
                 <Label>Preset Mode:</Label>
-                 <List class="self" filter="" method="preset_mode_list" dynamicReload="true"/>
+                 <List class="self" filter="" method="hvac_preset_mode_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
@@ -44,12 +44,12 @@
         <Name>Set Humidity Target</Name>
         <CallbackMethod>set_humidity_action</CallbackMethod>
         <ConfigUI>
-            <Field id="humidity" type="textfield" default="50">
+            <Field id="hvac_humidity" type="textfield" default="50">
                 <Label>Humidity:</Label>
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="sep3" />
+    <Action id="sep1" />
     <Action id="set_cover_position" deviceFilter="self.ha_cover">
         <Name>Set Cover Position</Name>
         <CallbackMethod>set_cover_position_action</CallbackMethod>
@@ -78,6 +78,42 @@
             <Field id="tilt_position" type="textfield" default="0">
                 <Label>Tilt Position (%):</Label>
             </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="sep2" />
+    <Action id="set_fan_direction" deviceFilter="self.ha_fan">
+        <Name>Set Direction</Name>
+        <CallbackMethod>set_fan_direction_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="direction" type="menu" defaultValue="Off">
+        		<Label>Direction:</Label>
+        		<List>
+        			<Option value="forward">Forward</Option>
+        			<Option value="reverse">Reverse</Option>
+        		</List>
+        	</Field>
+        </ConfigUI>    </Action>
+    <Action id="set_preset_mode" deviceFilter="self.ha_fan">
+        <Name>Set Preset Mode</Name>
+        <CallbackMethod>set_fan_preset_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="preset_mode" type="menu">
+                <Label>Preset Mode:</Label>
+                 <List class="self" filter="" method="preset_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_oscillate" deviceFilter="self.ha_fan">
+        <Name>Set Oscillate</Name>
+        <CallbackMethod>set_fan_oscillate_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="oscillate" type="menu" defaultValue="Off">
+        		<Label>Oscillate:</Label>
+        		<List>
+        			<Option value="0">Off</Option>
+        			<Option value="1">On</Option>
+        		</List>
+        	</Field>
         </ConfigUI>
     </Action>
 </Actions>
