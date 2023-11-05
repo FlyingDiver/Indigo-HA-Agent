@@ -111,6 +111,11 @@ class FanEntityFeature(IntFlag):
     DIRECTION = 4
     PRESET_MODE = 8
 
+
+class LockEntityFeature(IntFlag):
+    """Supported features of the lock entity."""
+    OPEN = 1
+
 ################################################################################
 
 class Plugin(indigo.PluginBase):
@@ -240,6 +245,10 @@ class Plugin(indigo.PluginBase):
             if features & FanEntityFeature.SET_SPEED:
                 new_props["SupportsFanSpeed"] = True
 
+        elif device.deviceTypeId == "ha_lock":
+            if features & LockEntityFeature.OPEN:
+                new_props["SupportsOpen"] = True
+
         device.replacePluginPropsOnServer(new_props)
         device.stateListOrDisplayStateIdChanged()
         self.entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
@@ -278,7 +287,7 @@ class Plugin(indigo.PluginBase):
 
         retList = []
         for entity_type, entity_list in self.ha_entity_map.items():
-            if entity_type not in ['climate', 'cover', 'light', 'sensor', 'switch', 'binary_sensor']:
+            if entity_type not in ['binary_sensor', 'climate', 'cover', 'fan', 'light', 'sensor', 'switch']:
                 retList.append((entity_type, entity_type))
         retList.sort(key=lambda tup: tup[1])
         self.logger.debug(f"get_entity_type_list: {retList = }")
@@ -450,31 +459,41 @@ class Plugin(indigo.PluginBase):
 
         elif device.deviceTypeId == "HAbinarySensorType":
             if entity["last_updated"] != device.states['lastUpdated']:
-                if isOff := entity["state"] == 'off':
-                    device.updateStateOnServer("onOffState", value=False)
-                else:
-                    device.updateStateOnServer("onOffState", value=True)
-                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateOnServer("actual_state", value=entity["state"])
-                if attributes.get('device_class', None) == 'occupancy':
-                    device.updateStateImageOnServer(indigo.kStateImageSel.MotionSensor if isOff else indigo.kStateImageSel.MotionSensorTripped)
-                elif attributes.get('device_class', None) == 'problem':
-                    device.updateStateImageOnServer(indigo.kStateImageSel.SensorOn if isOff else indigo.kStateImageSel.SensorTripped)
+
+                if attributes.get('device_class', None) in ['door', 'garage_door', 'lock', 'opening', 'window']:
+                    if isOff := entity["state"] == 'off':
+                        device.updateStateOnServer("onOffState", value=False, uiValue="Closed")
+                        device.updateStateImageOnServer(indigo.kStateImageSel.Locked)
+                    else:
+                        device.updateStateOnServer("onOffState", value=True, uiValue="Open")
+                        device.updateStateImageOnServer(indigo.kStateImageSel.Unlocked)
+
                 else:
-                    device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+                    if isOff := entity["state"] == 'off':
+                        device.updateStateOnServer("onOffState", value=False)
+                    else:
+                        device.updateStateOnServer("onOffState", value=True)
+
+                    if attributes.get('device_class', None) == 'occupancy':
+                        device.updateStateImageOnServer(indigo.kStateImageSel.MotionSensor if isOff else indigo.kStateImageSel.MotionSensorTripped)
+                    elif attributes.get('device_class', None) == 'problem':
+                        device.updateStateImageOnServer(indigo.kStateImageSel.SensorOn if isOff else indigo.kStateImageSel.SensorTripped)
+                    else:
+                        device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         elif device.deviceTypeId == "HAsensor":
             if entity["last_updated"] != device.states['lastUpdated']:
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
                 units = attributes.get("unit_of_measurement", "")
                 state_value = entity["state"]
                 if is_number(state_value):
                     device.updateStateOnServer("sensorValue", value=state_value, uiValue=f"{state_value}{units}")
                 else:
-                    self.logger.threaddebug(f"do_update: forcing value to 0.0 for : {device.name}")
                     device.updateStateOnServer("sensorValue", value=0.0, uiValue=state_value)
-                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
-                device.updateStateOnServer("actual_state", value=entity["state"])
+                    self.logger.debug(f"{device.name}: forcing sensorValue to 0.0")
                 if attributes.get('device_class', None) == 'temperature':
                     device.updateStateImageOnServer(indigo.kStateImageSel.TemperatureSensor)
                 elif attributes.get('device_class', None) == 'humidity':
@@ -484,37 +503,50 @@ class Plugin(indigo.PluginBase):
 
         elif device.deviceTypeId == "HAswitchType":
             if entity["last_updated"] != device.states['lastUpdated']:
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
                 if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
-                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
-                device.updateStateOnServer("actual_state", value=entity["state"])
-                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         elif device.deviceTypeId == "HAdimmerType":
             if entity["last_updated"] != device.states['lastUpdated']:
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
                 if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
                     position = attributes.get("position", 0)
                     device.updateStateOnServer("brightnessLevel", value=round(position))
+
+        elif device.deviceTypeId == "ha_lock":
+            if entity["last_updated"] != device.states['lastUpdated']:
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateOnServer("actual_state", value=entity["state"])
-                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+                if entity["state"] == 'locked':
+                    device.updateStateOnServer("onOffState", value=True)
+                    device.updateStateImageOnServer(indigo.kStateImageSel.Locked)
+                else:
+                    device.updateStateOnServer("onOffState", value=False)
+                    device.updateStateImageOnServer(indigo.kStateImageSel.Unlocked)
 
         elif device.deviceTypeId == "ha_cover":
             if entity["last_updated"] != device.states['lastUpdated']:
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
+                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
                 if entity["state"] == 'closed':
                     device.updateStateOnServer("onOffState", value=False, uiValue="Closed")
                 else:
                     device.updateStateOnServer("onOffState", value=True, uiValue=entity["state"].capitalize())
-                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
-                device.updateStateOnServer("actual_state", value=entity["state"])
-                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         elif device.deviceTypeId == "ha_fan":
+            device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+            device.updateStateOnServer("actual_state", value=entity["state"])
+            device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+
             speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
             if entity["last_updated"] != device.states['lastUpdated']:
                 if entity["state"] == 'off':
@@ -524,9 +556,6 @@ class Plugin(indigo.PluginBase):
                     speed_index = round(speed_percentage / speed_index_scale_factor)
                     device.updateStateOnServer("onOffState", value=True, uiValue="On")
                     device.updateStateOnServer("speedIndex", speed_index)
-                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
-                device.updateStateOnServer("actual_state", value=entity["state"])
-                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
         elif device.deviceTypeId == "ha_generic":
             device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
@@ -580,6 +609,16 @@ class Plugin(indigo.PluginBase):
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
                 msg_data['service'] = 'close_cover'
+                self.send_ws(msg_data)
+
+        if device.deviceTypeId == "ha_lock":
+            msg_data['domain'] = 'lock'
+            if action.deviceAction == indigo.kDeviceAction.TurnOn:
+                msg_data['service'] = 'lock'
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
+                msg_data['service'] = 'unlock'
                 self.send_ws(msg_data)
 
     ########################################
@@ -727,6 +766,21 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
+    def hvac_fan_preset_list(self, filter, values_dict, type_id, target_id):
+        self.logger.debug(f"hvac_fan_preset_list: type_id = {type_id}, target_id = {target_id}")
+        device = indigo.devices[target_id]
+        parts = device.address.split('.')
+        try:
+            entity = self.ha_entity_map[parts[0]][parts[1]]
+        except Exception as err:
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            return
+
+        if entity['attributes'].get('preset_modes', None):
+            return [(preset, preset) for preset in entity['attributes']['preset_modes']]
+        else:
+            return []
+
     def set_hvac_fan_mode_action(self, plugin_action, device, callerWaitingForResult):
         mode = plugin_action.props.get("fan_mode", None)
         self.logger.debug(f"{device.name}: set_fan_mode_action: {mode} for {device.address}")
@@ -853,6 +907,33 @@ class Plugin(indigo.PluginBase):
                     'service': 'oscillate', 'service_data': {"oscillating": bool(int(plugin_action.props.get("oscillate", 0)))}}
         self.send_ws(msg_data)
 
+
+    def set_fan_preset_mode_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: set_fan_preset_mode_action for {device.address}")
+        if not device.pluginProps.get("SupportsFanPresetMode", None):
+            self.logger.warning(f"{device.name}: set_fan_preset_mode_action: {device.address} does not support preset modes")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'fan',
+                    'service': 'set_preset_mode', 'service_data': {"preset_mode": plugin_action.props.get("preset_mode")}}
+        self.send_ws(msg_data)
+
+    ################################################################################
+
+    def send_generic_command(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: send_generic_command for {device.address}, {plugin_action.props}")
+
+        domain = device.address.split('.')[0]
+        service = self.substitute(plugin_action.props.get("service_cmd", None))
+        service_data = json.loads(self.substitute(plugin_action.props.get("service_data", None)))
+        self.logger.debug(f"{device.name}: send_generic_command: {domain=} {service=} {service_data=}")
+        if domain and service and service_data:
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': domain,
+                        'service': service, 'service_data': service_data}
+            self.send_ws(msg_data)
+        else:
+            self.logger.warning(f"{device.name}: send_generic_command: missing domain, service, or service_data")
+            return
+
     ################################################################################
     # Minimal Websocket Client
     ################################################################################
@@ -944,30 +1025,32 @@ class Plugin(indigo.PluginBase):
         # ignore these...  they are too noisy
         elif (msg.get('type', None) == 'event' and
               msg['event'].get('event_type', None) in [
-                  'recorder_5min_statistics_generated',
-                  'recorder_hourly_statistics_generated',
-                  'lovelace_updated',
-                  'device_registry_updated',
-                  'entity_registry_updated',
-                  'service_registered',
-                  'service_removed',
-                  'script_started',
-                  'component_loaded',
-                  'homeassistant_started',
-                  'homeassistant_start',
-                  'core_config_updated',
-                  'config_entry_discovered',
-                  'panels_updated',
-                  'area_registry_updated',
-                  'ios.became_active',
-                  'ios.finished_launching',
-                  'ios.entered_background',
-                  'ios.notification_action_fired',
-                  'mobile_app_notification_action',
-                  'automation_reloaded',
-                  'data_entry_flow_progressed',
-                  'ultrasync_zone_update',
-                  'insteon.button_on',
+                    'recorder_5min_statistics_generated',
+                    'recorder_hourly_statistics_generated',
+                    'lovelace_updated',
+                    'device_registry_updated',
+                    'entity_registry_updated',
+                    'service_registered',
+                    'service_removed',
+                    'script_started',
+                    'component_loaded',
+                    'homeassistant_started',
+                    'homeassistant_start',
+                    'homeassistant_stop',
+                    'core_config_updated',
+                    'config_entry_discovered',
+                    'panels_updated',
+                    'area_registry_updated',
+                    'ios.became_active',
+                    'ios.finished_launching',
+                    'ios.entered_background',
+                    'ios.notification_action_fired',
+                    'mobile_app_notification_action',
+                    'automation_reloaded',
+                    'data_entry_flow_progressed',
+                    'ultrasync_zone_update',
+                    'insteon.button_on',
+                    'logging_changed',
               ]):
             pass
 

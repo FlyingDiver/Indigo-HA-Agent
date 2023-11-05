@@ -210,6 +210,30 @@
 		</States>
 	</Device>
 
+	<Device type="relay" id="ha_lock" subType="kRelayDeviceSubType.Lock" ui="Lock">
+		<Name>Home Assistant Lock</Name>
+		<ConfigUI>
+			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="lock" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+		</ConfigUI>
+		<States>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
+			</State>
+		</States>
+	</Device>
+
 	<Device type="speedcontrol" id="ha_fan">
 		<Name>Home Assistant Fan</Name>
 		<ConfigUI>

@@ -92,7 +92,8 @@
         			<Option value="reverse">Reverse</Option>
         		</List>
         	</Field>
-        </ConfigUI>    </Action>
+        </ConfigUI>
+    </Action>
     <Action id="set_preset_mode" deviceFilter="self.ha_fan">
         <Name>Set Preset Mode</Name>
         <CallbackMethod>set_fan_preset_mode_action</CallbackMethod>
@@ -116,4 +117,21 @@
         	</Field>
         </ConfigUI>
     </Action>
+    <Action id="sep9" />
+    <Action id="send_generic_command" deviceFilter="self.ha_generic">
+        <Name>Send Generic Device Command</Name>
+        <CallbackMethod>send_generic_command</CallbackMethod>
+        <ConfigUI>
+            <Field id="service_cmd" type="textfield" defaultValue="">
+        		<Label>Service Command:</Label>
+        	</Field>
+            <Field id="service_data" type="textfield" defaultValue="">
+        		<Label>Service Data:</Label>
+        	</Field>
+            <Field id="service_data_note" type="label" fontSize="small" fontColor="darkgray">
+                <Label>Variable and Device State Substitution is enabled for all fields. Use the format %%v:12345%% for variables and %%d:12345:someStateId%% for device states.</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
+
 </Actions>
