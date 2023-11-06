@@ -9,10 +9,13 @@ is not on the LAN, you can enter the IP address or DNS name and port manually.
 
 The plugin supports the following Home Assistant device types:
  
-| Home Assistant | Indigo     |
-|----------------|------------|
-| Climate        | Thermostat |
-| Light          | Dimmer     |
-| Switch         | Relay      |
-| Binary Sensor  | Sensor     |
-| Sensor         | Sensor     |
+| Home Assistant | Indigo       |
+|----------------|--------------|
+| Climate        | Thermostat   |
+| Light          | Dimmer       |
+| Switch         | Relay        |
+| Binary Sensor  | Sensor       |
+| Sensor         | Sensor       |
+| Fan            | SpeedControl |
+| Cover          | Relay        |
+| Lock           | Lock         |
