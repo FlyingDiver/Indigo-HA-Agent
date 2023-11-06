@@ -462,12 +462,20 @@ class Plugin(indigo.PluginBase):
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateOnServer("actual_state", value=entity["state"])
 
-                if attributes.get('device_class', None) in ['door', 'garage_door', 'lock', 'opening', 'window']:
+                if attributes.get('device_class', None) in ['door', 'garage_door', 'opening', 'window']:
                     if isOff := entity["state"] == 'off':
                         device.updateStateOnServer("onOffState", value=False, uiValue="Closed")
-                        device.updateStateImageOnServer(indigo.kStateImageSel.Locked)
+                        device.updateStateImageOnServer(indigo.kStateImageSel.Closed)
                     else:
                         device.updateStateOnServer("onOffState", value=True, uiValue="Open")
+                        device.updateStateImageOnServer(indigo.kStateImageSel.Open)
+
+                elif attributes.get('device_class', None) == 'lock':
+                    if isOff := entity["state"] == 'off':
+                        device.updateStateOnServer("onOffState", value=False, uiValue="Locked")
+                        device.updateStateImageOnServer(indigo.kStateImageSel.Locked)
+                    else:
+                        device.updateStateOnServer("onOffState", value=True, uiValue="Unlocked")
                         device.updateStateImageOnServer(indigo.kStateImageSel.Unlocked)
 
                 else:
@@ -539,8 +547,10 @@ class Plugin(indigo.PluginBase):
                 device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
                 if entity["state"] == 'closed':
                     device.updateStateOnServer("onOffState", value=False, uiValue="Closed")
+                    device.updateStateImageOnServer(indigo.kStateImageSel.Closed)
                 else:
                     device.updateStateOnServer("onOffState", value=True, uiValue=entity["state"].capitalize())
+                    device.updateStateImageOnServer(indigo.kStateImageSel.Open)
 
         elif device.deviceTypeId == "ha_fan":
             device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
