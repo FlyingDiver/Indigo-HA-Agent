@@ -4,6 +4,9 @@
     <Event id="automationEvent">
         <Name>Home Assistant Automation Event</Name>
     </Event>
+    <Event id="connection_event">
+        <Name>Home Assistant Connection Event</Name>
+    </Event>
 </Events>
 
 

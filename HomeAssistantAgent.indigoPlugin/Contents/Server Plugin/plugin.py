@@ -27,7 +27,6 @@ def is_number(input_str):
     except ValueError:
         return False
 
-################################################################################
 
 HVAC_MODE_ENUM_TO_STR_MAP = {
     indigo.kHvacMode.Cool: "cool",
@@ -128,13 +127,13 @@ class Plugin(indigo.PluginBase):
 
         pfmt = logging.Formatter('%(asctime)s.%(msecs)03d\t[%(levelname)8s] %(name)20s.%(funcName)-25s%(msg)s', datefmt='%Y-%m-%d %H:%M:%S')
         self.plugin_file_handler.setFormatter(pfmt)
+        self.logLevel = int(pluginPrefs.get("logLevel", logging.INFO))
+        self.indigo_log_handler.setLevel(self.logLevel)
+        self.pluginPrefs = pluginPrefs
 
         self.websocket_thread = None
-        self.logLevel = None
-        self.ha_token = None
-        self.server_port = None
-        self.server_address = None
         self.ws = None
+        self.ws_connected = False
         self.var_folder = None
         self.found_ha_servers = {}
         self.entity_devices = {}
@@ -142,17 +141,8 @@ class Plugin(indigo.PluginBase):
         self.last_sent_id = 0
         self.ha_entity_map = {}
 
-        self.updatePrefs(pluginPrefs)
-
-    def updatePrefs(self, pluginPrefs):
-        self.server_address = pluginPrefs.get('address', 'localhost')
-        self.server_port = (pluginPrefs.get('port', '8123'))
-        self.ha_token = pluginPrefs.get('haToken', '')
-        self.logLevel = int(pluginPrefs.get("logLevel", logging.INFO))
-        self.indigo_log_handler.setLevel(self.logLevel)
-        self.logger.debug(f"logLevel = {self.logLevel}")
-
     ########################################
+
     def startup(self):
         self.logger.debug("startup called")
 
@@ -160,15 +150,21 @@ class Plugin(indigo.PluginBase):
         services = ["_home-assistant._tcp.local."]
         browser = ServiceBrowser(zeroconf, services, handlers=[self.on_service_state_change])
 
-        # start up the websocket receiver thread
-        ws_url = f"ws://{self.server_address}:{self.server_port}/api/websocket"
-        self.websocket_thread = threading.Thread(target=self.ws_client, args=(ws_url,)).start()
-
         # get the folder for the event variables
         if "HAA_Event" in indigo.variables.folders:
             self.var_folder = indigo.variables.folders["HAA_Event"]
         else:
             self.var_folder = indigo.variables.folder.create("HAA_Event")
+
+        haToken = self.pluginPrefs.get('haToken')
+        if haToken and len(haToken):
+            self.start_websocket()
+
+    # start up the websocket receiver thread
+    def start_websocket(self, delay=0):
+        self.logger.debug(f"start_websocket called with {delay=}, using {self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}")
+        ws_url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
+        self.websocket_thread = threading.Timer(delay, self.ws_client, args=(ws_url,)).start()
 
     def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
@@ -265,7 +261,13 @@ class Plugin(indigo.PluginBase):
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
-            self.updatePrefs(valuesDict)
+            self.logger.threaddebug(f"closedPrefsConfigUi: valuesDict = {valuesDict}")
+            self.logLevel = int(self.pluginPrefs.get("logLevel", logging.INFO))
+            self.indigo_log_handler.setLevel(self.logLevel)
+            self.logger.debug(f"logLevel = {self.logLevel}")
+            haToken = valuesDict.get('haToken')
+            if haToken and len(haToken):
+                self.start_websocket()
 
     def found_server_list(self, filter=None, valuesDict=None, typeId=0, targetId=0):
         self.logger.debug(f"found_server_list: filter = {filter}, typeId = {typeId}, targetId = {targetId}, valuesDict = {valuesDict}")
@@ -276,7 +278,7 @@ class Plugin(indigo.PluginBase):
         return retList
 
     def menuChangedConfig(self, valuesDict):
-        self.logger.debug(f"menuChanged: valuesDict = {valuesDict}")
+        self.logger.threaddebug(f"menuChanged: valuesDict = {valuesDict}")
         data = self.found_ha_servers.get(valuesDict['found_list'], None)
         valuesDict['address'] = data['ip_address']
         valuesDict['port'] = data['port']
@@ -677,7 +679,7 @@ class Plugin(indigo.PluginBase):
     def actionControlSpeedControl(self, action, device):
         self.logger.debug(f"{device.name}: sending {action.speedControlAction} {action.actionValue} to {device.address}")
         msg_data = {"type": "call_service", "domain": 'fan', "target": {"entity_id": device.address}}
-        speed_index_scale_factor = int(100 / (device.speedIndexCount -1))
+        speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
 
         if action.speedControlAction == indigo.kSpeedControlAction.TurnOn:
             msg_data['service'] = 'turn_on'
@@ -917,7 +919,6 @@ class Plugin(indigo.PluginBase):
                     'service': 'oscillate', 'service_data': {"oscillating": bool(int(plugin_action.props.get("oscillate", 0)))}}
         self.send_ws(msg_data)
 
-
     def set_fan_preset_mode_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_fan_preset_mode_action for {device.address}")
         if not device.pluginProps.get("SupportsFanPresetMode", None):
@@ -953,9 +954,9 @@ class Plugin(indigo.PluginBase):
         websocket.setdefaulttimeout(5)
         try:
             self.ws = websocket.WebSocketApp(url, on_open=self.on_open,
-                                         on_message=self.on_message,
-                                         on_error=self.on_error,
-                                         on_close=self.on_close)
+                                             on_message=self.on_message,
+                                             on_error=self.on_error,
+                                             on_close=self.on_close)
         except Exception as err:
             self.logger.error(f"Error connecting to '{url}': {err}")
             return
@@ -971,10 +972,11 @@ class Plugin(indigo.PluginBase):
 
         if msg['type'] == 'auth_required':
             self.logger.debug(f"Websocket got auth_required for ha_version {msg['ha_version']}, sending auth_token")
-            self.ws.send(json.dumps({'type': 'auth', 'access_token': self.ha_token}))
+            self.ws.send(json.dumps({'type': 'auth', 'access_token': self.pluginPrefs.get('haToken')}))
 
         elif msg['type'] == 'auth_ok':
             self.logger.debug(f"Websocket got auth_ok for ha_version {msg['ha_version']}")
+            self.ws_connected = True
 
             # subscribe to events
             self.send_ws({"type": 'subscribe_events'})
@@ -1061,6 +1063,7 @@ class Plugin(indigo.PluginBase):
                     'ultrasync_zone_update',
                     'insteon.button_on',
                     'logging_changed',
+                    'lutron_event',
               ]):
             pass
 
@@ -1068,13 +1071,25 @@ class Plugin(indigo.PluginBase):
             self.logger.warning(f"Websocket unknown message type: {json.dumps(msg)}")
 
     def send_ws(self, msg_data):
+        if not self.ws or not self.ws_connected:
+            self.logger.error(f"Websocket not connected, cannot send: {msg_data}")
+            return
+
         self.last_sent_id += 1
         msg_data['id'] = self.last_sent_id
         self.ws.send(json.dumps(msg_data))
         self.sent_messages[self.last_sent_id] = msg_data
 
     def on_close(self, ws, close_status_code, close_msg):
-        self.logger.debug(f"Websocket closed: {close_status_code} {close_msg}")
+        self.logger.warning(f"Websocket closed: {close_status_code} {close_msg}")
+        self.ws_connected = False
 
     def on_error(self, ws, error):
-        self.logger.debug(f"Websocket error: {error}")
+        self.logger.error(f"Websocket error: {error}")
+        self.ws_connected = False
+        for trigger in indigo.triggers.iter("self"):
+            if trigger.pluginTypeId == "connection_event":
+                indigo.trigger.execute(trigger)
+
+        # try to restart the websocket
+        self.start_websocket(delay=5)
