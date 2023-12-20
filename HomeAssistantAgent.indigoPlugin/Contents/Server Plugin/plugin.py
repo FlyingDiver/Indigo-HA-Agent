@@ -160,12 +160,6 @@ class Plugin(indigo.PluginBase):
         if haToken and len(haToken):
             self.start_websocket()
 
-    # start up the websocket receiver thread
-    def start_websocket(self, delay=0):
-        self.logger.debug(f"start_websocket called with {delay=}, using {self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}")
-        ws_url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
-        self.websocket_thread = threading.Timer(delay, self.ws_client, args=(ws_url,)).start()
-
     def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
         info = zeroconf.get_service_info(service_type, name)
@@ -948,6 +942,13 @@ class Plugin(indigo.PluginBase):
     ################################################################################
     # Minimal Websocket Client
     ################################################################################
+
+    # start up the websocket receiver thread
+    def start_websocket(self, delay=0):
+        self.logger.debug(f"start_websocket called with {delay=}, using {self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}")
+        ws_url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
+        self.websocket_thread = threading.Timer(delay, self.ws_client, args=(ws_url,)).start()
+
     def ws_client(self, url):
         self.logger.debug(f"Attempting connection to '{url}'")
 
