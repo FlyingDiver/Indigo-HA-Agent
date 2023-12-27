@@ -16,6 +16,13 @@
     <Field type="textfield" id="haToken" defaultvalue="1234abcd">
         <Label>Home Assistant Long-Lived Access Tokens:</Label>
     </Field>
+     <Field id="temp_scale" type="menu" defaultValue="F">
+        <Label>Temperature Scale:</Label>
+        <List>
+            <Option value="F">Fahrenheit</Option>
+            <Option value="C">Celsius</Option>
+        </List>
+    </Field>
     <Field id="logLevel" type="menu" defaultValue="20">
         <Label>Event Logging Level:</Label>
         <List>

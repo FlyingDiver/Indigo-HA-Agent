@@ -5,7 +5,7 @@
 		<ConfigUI>
 			<Field id="SupportsStatusRequest"        type="checkbox"  defaultValue="false" hidden="true" />
             <Field id="NumTemperatureInputs"         type="textfield" defaultValue="0"     hidden="true"/>
-            <Field id="NumHumidityInputs"            type="textfield" defaultValue="0"     hidden="true"/>
+            <Field id="NumHumidityInputs"            type="textfield" defaultValue="1"     hidden="true"/>
             <Field id="SupportsHvacFanMode"          type="checkbox"  defaultValue="false" hidden="true"/>
 			<Field id="SupportsHeatSetpoint"         type="checkbox"  defaultValue="false" hidden="true"/>
             <Field id="SupportsCoolSetpoint"         type="checkbox"  defaultValue="false" hidden="true"/>

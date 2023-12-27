@@ -441,7 +441,7 @@ class Plugin(indigo.PluginBase):
 
                 if attributes.get("current_temperature", None):
                     update_list.append({'key': "temperatureInput1", 'value': attributes["current_temperature"],
-                                        'uiValue': f"{attributes['current_temperature']}\u00b0F"})
+                                        'uiValue': f"{attributes['current_temperature']}\u00b0{self.pluginPrefs.get('temp_scale', '')}"})
 
                 if attributes.get("current_humidity", None):
                     update_list.append({'key': "humidityInput1", 'value': attributes["current_humidity"],
