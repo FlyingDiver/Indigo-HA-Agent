@@ -8,17 +8,18 @@ import threading
 import websocket
 from enum import IntFlag
 
+import_errors = []
 try:
     from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
 except ImportError:
-    raise ImportError("'Required Python libraries missing.  Run 'pip3 install zeroconf' in Terminal window, then reload plugin.")
-
+    import_errors.append("zeroconf")
 
 def _update_indigo_var(name, value, folder):
     if name not in indigo.variables:
         indigo.variable.create(name, value, folder)
     else:
         indigo.variable.updateValue(name, value)
+
 
 def is_number(input_str):
     try:
@@ -75,6 +76,7 @@ def _lookup_hvac_mode_from_action_str(hvac_mode):
 def _lookup_fan_mode_from_action_str(fan_mode):
     return FAN_MODE_STR_TO_ENUM_MAP.get(fan_mode.lower(), indigo.kFanMode.Auto)
 
+
 # Home Assistant Features
 class CoverEntityFeature(IntFlag):
     """Supported features of the cover entity."""
@@ -87,6 +89,7 @@ class CoverEntityFeature(IntFlag):
     STOP_TILT = 64
     SET_TILT_POSITION = 128
 
+
 class ClimateEntityFeature(IntFlag):
     """Supported features of the climate entity."""
     TARGET_TEMPERATURE = 1
@@ -97,11 +100,13 @@ class ClimateEntityFeature(IntFlag):
     SWING_MODE = 32
     AUX_HEAT = 64
 
+
 class LightEntityFeature(IntFlag):
     """Supported features of the light entity."""
     EFFECT = 4
     FLASH = 8
     TRANSITION = 32
+
 
 class FanEntityFeature(IntFlag):
     """Supported features of the fan entity."""
@@ -114,6 +119,7 @@ class FanEntityFeature(IntFlag):
 class LockEntityFeature(IntFlag):
     """Supported features of the lock entity."""
     OPEN = 1
+
 
 ################################################################################
 
@@ -128,6 +134,7 @@ class Plugin(indigo.PluginBase):
         pfmt = logging.Formatter('%(asctime)s.%(msecs)03d\t[%(levelname)8s] %(name)20s.%(funcName)-25s%(msg)s', datefmt='%Y-%m-%d %H:%M:%S')
         self.plugin_file_handler.setFormatter(pfmt)
         self.logLevel = int(pluginPrefs.get("logLevel", logging.INFO))
+        self.logger.debug(f"{self.logLevel=}")
         self.indigo_log_handler.setLevel(self.logLevel)
         self.pluginPrefs = pluginPrefs
 
@@ -146,6 +153,13 @@ class Plugin(indigo.PluginBase):
     def startup(self):
         self.logger.debug("startup called")
 
+        if len(import_errors):
+            msg = f"Required Python libraries missing.  Run the following command(s) in a Terminal window to install them, then reload the plugin.\n\n"
+            for i in import_errors:
+                msg += f'pip3 install {i} -t "{self.pluginFolderPath}/Contents/Packages/"\n'
+            self.logger.error(msg)
+            return "Plugin startup cancelled due to missing Python libraries."
+
         zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
         services = ["_home-assistant._tcp.local."]
         browser = ServiceBrowser(zeroconf, services, handlers=[self.on_service_state_change])
@@ -160,7 +174,7 @@ class Plugin(indigo.PluginBase):
         if haToken and len(haToken):
             self.start_websocket()
 
-    def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
+    def on_service_state_change(self, zeroconf, service_type: str, name: str, state_change) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
         info = zeroconf.get_service_info(service_type, name)
         ip_address = ".".join([f"{x}" for x in info.addresses[0]])  # address as string (xx.xx.xx.xx)
@@ -183,6 +197,7 @@ class Plugin(indigo.PluginBase):
     ########################################
 
     def deviceStartComm(self, device):
+
         self.logger.info(f"{device.name}: Starting Agent device for entity '{device.address}'")
         self.entity_devices[device.address] = device.id
         parts = device.address.split('.')
@@ -945,7 +960,8 @@ class Plugin(indigo.PluginBase):
 
     # start up the websocket receiver thread
     def start_websocket(self, delay=0):
-        self.logger.debug(f"start_websocket called with {delay=}, using {self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}")
+        self.logger.debug(
+            f"start_websocket called with {delay=}, using {self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}")
         ws_url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
         self.websocket_thread = threading.Timer(delay, self.ws_client, args=(ws_url,)).start()
 
@@ -1025,11 +1041,11 @@ class Plugin(indigo.PluginBase):
             self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
             self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
 
-            _update_indigo_var("event_type",   event.get('event_type', None), self.var_folder)
-            _update_indigo_var("event_time",   event.get('time_fired', None), self.var_folder)
+            _update_indigo_var("event_type", event.get('event_type', None), self.var_folder)
+            _update_indigo_var("event_time", event.get('time_fired', None), self.var_folder)
             _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
-            _update_indigo_var("event_id",     data.get('entity_id', None), self.var_folder)
-            _update_indigo_var("event_name",   data.get('name', None), self.var_folder)
+            _update_indigo_var("event_id", data.get('entity_id', None), self.var_folder)
+            _update_indigo_var("event_name", data.get('name', None), self.var_folder)
 
             for trigger in indigo.triggers.iter("self"):
                 if trigger.pluginTypeId == "automationEvent":
@@ -1038,33 +1054,33 @@ class Plugin(indigo.PluginBase):
         # ignore these...  they are too noisy
         elif (msg.get('type', None) == 'event' and
               msg['event'].get('event_type', None) in [
-                    'recorder_5min_statistics_generated',
-                    'recorder_hourly_statistics_generated',
-                    'lovelace_updated',
-                    'device_registry_updated',
-                    'entity_registry_updated',
-                    'service_registered',
-                    'service_removed',
-                    'script_started',
-                    'component_loaded',
-                    'homeassistant_started',
-                    'homeassistant_start',
-                    'homeassistant_stop',
-                    'core_config_updated',
-                    'config_entry_discovered',
-                    'panels_updated',
-                    'area_registry_updated',
-                    'ios.became_active',
-                    'ios.finished_launching',
-                    'ios.entered_background',
-                    'ios.notification_action_fired',
-                    'mobile_app_notification_action',
-                    'automation_reloaded',
-                    'data_entry_flow_progressed',
-                    'ultrasync_zone_update',
-                    'insteon.button_on',
-                    'logging_changed',
-                    'lutron_event',
+                  'recorder_5min_statistics_generated',
+                  'recorder_hourly_statistics_generated',
+                  'lovelace_updated',
+                  'device_registry_updated',
+                  'entity_registry_updated',
+                  'service_registered',
+                  'service_removed',
+                  'script_started',
+                  'component_loaded',
+                  'homeassistant_started',
+                  'homeassistant_start',
+                  'homeassistant_stop',
+                  'core_config_updated',
+                  'config_entry_discovered',
+                  'panels_updated',
+                  'area_registry_updated',
+                  'ios.became_active',
+                  'ios.finished_launching',
+                  'ios.entered_background',
+                  'ios.notification_action_fired',
+                  'mobile_app_notification_action',
+                  'automation_reloaded',
+                  'data_entry_flow_progressed',
+                  'ultrasync_zone_update',
+                  'insteon.button_on',
+                  'logging_changed',
+                  'lutron_event',
               ]):
             pass
 

@@ -5,9 +5,7 @@
 	<key>PluginVersion</key>
 	<string>2023.3.2</string>
 	<key>ServerApiVersion</key>
-	<string>3.0</string>
-	<key>IwsApiVersion</key>
-	<string>1.0.0</string>
+	<string>3.4</string>
 	<key>CFBundleDisplayName</key>
 	<string>Home Assistant Agent</string>
 	<key>CFBundleIdentifier</key>
