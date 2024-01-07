@@ -7,12 +7,7 @@ import json
 import threading
 import websocket
 from enum import IntFlag
-
-import_errors = []
-try:
-    from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
-except ImportError:
-    import_errors.append("zeroconf")
+from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
 
 def _update_indigo_var(name, value, folder):
     if name not in indigo.variables:
@@ -153,13 +148,6 @@ class Plugin(indigo.PluginBase):
     def startup(self):
         self.logger.debug("startup called")
 
-        if len(import_errors):
-            msg = f"Required Python libraries missing.  Run the following command(s) in a Terminal window to install them, then reload the plugin.\n\n"
-            for i in import_errors:
-                msg += f'pip3 install {i} -t "{self.pluginFolderPath}/Contents/Packages/"\n'
-            self.logger.error(msg)
-            return "Plugin startup cancelled due to missing Python libraries."
-
         zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
         services = ["_home-assistant._tcp.local."]
         browser = ServiceBrowser(zeroconf, services, handlers=[self.on_service_state_change])
@@ -174,7 +162,7 @@ class Plugin(indigo.PluginBase):
         if haToken and len(haToken):
             self.start_websocket()
 
-    def on_service_state_change(self, zeroconf, service_type: str, name: str, state_change) -> None:
+    def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
         info = zeroconf.get_service_info(service_type, name)
         ip_address = ".".join([f"{x}" for x in info.addresses[0]])  # address as string (xx.xx.xx.xx)
