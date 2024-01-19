@@ -325,6 +325,7 @@ class Plugin(indigo.PluginBase):
 
         # check for deleted entity
         if entity is None:
+            self.logger.debug(f"Removing {entity_id} from ha_entity_map")
             del self.ha_entity_map[parts[0]][parts[1]]
             return
 
@@ -525,8 +526,8 @@ class Plugin(indigo.PluginBase):
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
-                    position = attributes.get("position", 0)
-                    device.updateStateOnServer("brightnessLevel", value=round(position))
+                    brightness = attributes.get("brightness", 0)
+                    device.updateStateOnServer("brightnessLevel", value=round(brightness / 255 * 100))
 
         elif device.deviceTypeId == "ha_lock":
             if entity["last_updated"] != device.states['lastUpdated']:
@@ -578,7 +579,7 @@ class Plugin(indigo.PluginBase):
     # Relay/Dimmer Action methods
     ########################################
     def actionControlDimmerRelay(self, action, device):
-        self.logger.debug(f"{device.name}: sending {action.deviceAction} to {device.address}")
+        self.logger.debug(f"{device.name}: sending {action.deviceAction} ({action.actionValue}) to {device.address}")
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}}
 
         if device.deviceTypeId == "HAswitchType":
@@ -674,7 +675,7 @@ class Plugin(indigo.PluginBase):
     # Speed Control Action callbacks
     ######################
     def actionControlSpeedControl(self, action, device):
-        self.logger.debug(f"{device.name}: sending {action.speedControlAction} {action.actionValue} to {device.address}")
+        self.logger.debug(f"{device.name}: sending {action.speedControlAction} ({action.actionValue}) to {device.address}")
         msg_data = {"type": "call_service", "domain": 'fan', "target": {"entity_id": device.address}}
         speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
 
@@ -1016,7 +1017,7 @@ class Plugin(indigo.PluginBase):
 
         elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
             self.logger.debug(
-                f"Button event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
+                f"lutron_caseta_button_event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
 
         elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'call_service':
             data = msg['event']['data']
