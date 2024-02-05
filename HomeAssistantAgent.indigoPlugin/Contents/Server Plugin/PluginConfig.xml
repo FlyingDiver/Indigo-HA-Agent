@@ -13,7 +13,7 @@
         <Label>Home Assistant Server Port:</Label>
         <CallbackMethod>menuChangedConfig</CallbackMethod>
     </Field>
-    <Field type="textfield" id="haToken" defaultvalue="1234abcd">
+    <Field type="textfield" id="haToken" defaultvalue="">
         <Label>Home Assistant Long-Lived Access Tokens:</Label>
     </Field>
      <Field id="temp_scale" type="menu" defaultValue="F">

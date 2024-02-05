@@ -148,9 +148,12 @@ class Plugin(indigo.PluginBase):
     def startup(self):
         self.logger.debug("startup called")
 
-        zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
-        services = ["_home-assistant._tcp.local."]
-        browser = ServiceBrowser(zeroconf, services, handlers=[self.on_service_state_change])
+        try:
+            zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
+            services = ["_home-assistant._tcp.local."]
+            browser = ServiceBrowser(zeroconf, services, handlers=[self.on_service_state_change])
+        except Exception as e:
+            self.logger.error(f"Error starting zeroconf: {e}")
 
         # get the folder for the event variables
         if "HAA_Event" in indigo.variables.folders:
@@ -276,9 +279,9 @@ class Plugin(indigo.PluginBase):
 
     def menuChangedConfig(self, valuesDict):
         self.logger.threaddebug(f"menuChanged: valuesDict = {valuesDict}")
-        data = self.found_ha_servers.get(valuesDict['found_list'], None)
-        valuesDict['address'] = data['ip_address']
-        valuesDict['port'] = data['port']
+        if data := self.found_ha_servers.get(valuesDict['found_list'], None):
+            valuesDict['address'] = data['ip_address']
+            valuesDict['port'] = data['port']
         return valuesDict
 
     def get_entity_type_list(self, filter="", valuesDict=None, typeId="", targetId=0):
@@ -467,8 +470,8 @@ class Plugin(indigo.PluginBase):
                         device.updateStateOnServer("onOffState", value=False, uiValue="Closed")
                         device.updateStateImageOnServer(indigo.kStateImageSel.Closed)
                     else:
-                        device.updateStateOnServer("onOffState", value=True, uiValue="Open")
-                        device.updateStateImageOnServer(indigo.kStateImageSel.Open)
+                        device.updateStateOnServer("onOffState", value=True, uiValue="Opened")
+                        device.updateStateImageOnServer(indigo.kStateImageSel.Opened)
 
                 elif attributes.get('device_class', None) == 'lock':
                     if isOff := entity["state"] == 'off':
