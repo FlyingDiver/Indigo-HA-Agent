@@ -262,6 +262,30 @@
 		</States>
 	</Device>
 
+	<Device type="dimmer" id="ha_media_player">
+		<Name>Home Assistant Media Player</Name>
+		<ConfigUI>
+			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
+			<Field id="address" type="menu">
+                <Label>Entity:</Label>
+                <List class="self" method="get_entity_list" filter="media_player" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+		</ConfigUI>
+		<States>
+			<State id="lastUpdated">
+				<ValueType>String</ValueType>
+				<TriggerLabel>lastUpdated</TriggerLabel>
+				<ControlPageLabel>lastUpdated</ControlPageLabel>
+			</State>
+			<State id="actual_state">
+				<ValueType>String</ValueType>
+				<TriggerLabel>Actual State</TriggerLabel>
+				<ControlPageLabel>Actual State</ControlPageLabel>
+			</State>
+		</States>
+	</Device>
+
 	<Device type="custom" id="ha_generic">
 		<Name>Home Assistant Generic Device</Name>
 		<ConfigUI>

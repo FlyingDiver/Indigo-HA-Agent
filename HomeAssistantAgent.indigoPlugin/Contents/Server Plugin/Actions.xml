@@ -118,6 +118,81 @@
         </ConfigUI>
     </Action>
     <Action id="sep9" />
+    <Action id="media_player_on" deviceFilter="self.ha_media_player">
+        <Name>Media Player On</Name>
+        <CallbackMethod>media_player_on_action</CallbackMethod>
+    </Action>
+        <Action id="media_player_off" deviceFilter="self.ha_media_player">
+        <Name>Media Player Off</Name>
+        <CallbackMethod>media_player_off_action</CallbackMethod>
+    </Action>
+    <Action id="media_player_set_volume" deviceFilter="self.ha_media_player">
+        <Name>Media Player Set Volume</Name>
+        <CallbackMethod>media_player_set_volume_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="volume" type="textfield" default="0">
+                <Label>Volume (%):</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="media_player_volume_up" deviceFilter="self.ha_media_player">
+        <Name>Media Player Volume Up</Name>
+        <CallbackMethod>media_player_volume_up_action</CallbackMethod>
+    </Action>
+    <Action id="media_player_volume_down" deviceFilter="self.ha_media_player">
+        <Name>Media Player Volume Down</Name>
+        <CallbackMethod>media_player_volume_down_action</CallbackMethod>
+    </Action>
+    <Action id="media_player_volume_mute" deviceFilter="self.ha_media_player">
+        <Name>Media Player Volume Mute</Name>
+        <CallbackMethod>media_player_volume_mute_action</CallbackMethod>
+    </Action>
+    <Action id="media_player_volume_unmute" deviceFilter="self.ha_media_player">
+        <Name>Media Player Volume Unmute</Name>
+        <CallbackMethod>media_player_volume_unmute_action</CallbackMethod>
+    </Action>
+    <Action id="media_player_media_play" deviceFilter="self.ha_media_player">
+        <Name>Media Player Media Play</Name>
+        <CallbackMethod>media_player_media_play_action</CallbackMethod>
+    </Action>
+    <Action id="media_player_media_pause" deviceFilter="self.ha_media_player">
+        <Name>Media Player Media Pause</Name>
+        <CallbackMethod>media_player_media_pause_action</CallbackMethod>
+    </Action>
+    <Action id="media_player_media_stop" deviceFilter="self.ha_media_player">
+        <Name>Media Player Media Stop</Name>
+        <CallbackMethod>media_player_media_stop_action</CallbackMethod>
+    </Action>
+    <Action id="media_player_set_shuffle" deviceFilter="self.ha_media_player">
+        <Name>Set Media Player Shuffle</Name>
+        <CallbackMethod>media_player_set_shuffle_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="shuffle" type="checkbox">
+                <Label>Shuffle Enabled:</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="media_play_set_source" deviceFilter="self.ha_media_player">
+        <Name>Set Media Player Source</Name>
+        <CallbackMethod>media_play_set_source_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="media_source" type="menu">
+                <Label>Media Source:</Label>
+                 <List class="self" filter="" method="media_player_source_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="media_play_set_mode" deviceFilter="self.ha_media_player">
+        <Name>Set Media Player Mode</Name>
+        <CallbackMethod>media_play_set_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="media_mode" type="menu">
+                <Label>Media Mode:</Label>
+                 <List class="self" filter="" method="media_player_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="sep10" />
     <Action id="send_generic_command" deviceFilter="self.ha_generic">
         <Name>Send Generic Device Command</Name>
         <CallbackMethod>send_generic_command</CallbackMethod>

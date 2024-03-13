@@ -9,6 +9,7 @@ import websocket
 from enum import IntFlag
 from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
 
+
 def _update_indigo_var(name, value, folder):
     if name not in indigo.variables:
         indigo.variable.create(name, value, folder)
@@ -114,6 +115,80 @@ class FanEntityFeature(IntFlag):
 class LockEntityFeature(IntFlag):
     """Supported features of the lock entity."""
     OPEN = 1
+
+
+class MediaPlayerEntityFeature(IntFlag):
+    """Supported features of the media player entity."""
+
+    PAUSE = 1
+    SEEK = 2
+    VOLUME_SET = 4
+    VOLUME_MUTE = 8
+    PREVIOUS_TRACK = 16
+    NEXT_TRACK = 32
+
+    TURN_ON = 128
+    TURN_OFF = 256
+    PLAY_MEDIA = 512
+    VOLUME_STEP = 1024
+    SELECT_SOURCE = 2048
+    STOP = 4096
+    CLEAR_PLAYLIST = 8192
+    PLAY = 16384
+    SHUFFLE_SET = 32768
+    SELECT_SOUND_MODE = 65536
+    BROWSE_MEDIA = 131072
+    REPEAT_SET = 262144
+    GROUPING = 524288
+    MEDIA_ANNOUNCE = 1048576
+    MEDIA_ENQUEUE = 2097152
+
+
+# #### SERVICES ####
+SERVICE_TURN_ON = "turn_on"
+SERVICE_TURN_OFF = "turn_off"
+SERVICE_TOGGLE = "toggle"
+SERVICE_RELOAD = "reload"
+
+SERVICE_VOLUME_UP = "volume_up"
+SERVICE_VOLUME_DOWN = "volume_down"
+SERVICE_VOLUME_MUTE = "volume_mute"
+SERVICE_VOLUME_SET = "volume_set"
+SERVICE_MEDIA_PLAY_PAUSE = "media_play_pause"
+SERVICE_MEDIA_PLAY = "media_play"
+SERVICE_MEDIA_PAUSE = "media_pause"
+SERVICE_MEDIA_STOP = "media_stop"
+SERVICE_MEDIA_NEXT_TRACK = "media_next_track"
+SERVICE_MEDIA_PREVIOUS_TRACK = "media_previous_track"
+SERVICE_MEDIA_SEEK = "media_seek"
+SERVICE_REPEAT_SET = "repeat_set"
+SERVICE_SHUFFLE_SET = "shuffle_set"
+
+
+SERVICE_CLEAR_PLAYLIST = "clear_playlist"
+SERVICE_JOIN = "join"
+SERVICE_PLAY_MEDIA = "play_media"
+SERVICE_SELECT_SOUND_MODE = "select_sound_mode"
+SERVICE_SELECT_SOURCE = "select_source"
+SERVICE_UNJOIN = "unjoin"
+
+
+SERVICE_LOCK = "lock"
+SERVICE_UNLOCK = "unlock"
+
+SERVICE_OPEN = "open"
+SERVICE_CLOSE = "close"
+
+SERVICE_CLOSE_COVER = "close_cover"
+SERVICE_CLOSE_COVER_TILT = "close_cover_tilt"
+SERVICE_OPEN_COVER = "open_cover"
+SERVICE_OPEN_COVER_TILT = "open_cover_tilt"
+SERVICE_SAVE_PERSISTENT_STATES = "save_persistent_states"
+SERVICE_SET_COVER_POSITION = "set_cover_position"
+SERVICE_SET_COVER_TILT_POSITION = "set_cover_tilt_position"
+SERVICE_STOP_COVER = "stop_cover"
+SERVICE_STOP_COVER_TILT = "stop_cover_tilt"
+SERVICE_TOGGLE_COVER_TILT = "toggle_cover_tilt"
 
 
 ################################################################################
@@ -245,6 +320,50 @@ class Plugin(indigo.PluginBase):
             if features & LockEntityFeature.OPEN:
                 new_props["SupportsOpen"] = True
 
+        elif device.deviceTypeId == "ha_media_player":
+            if features & MediaPlayerEntityFeature.TURN_ON:
+                new_props["SupportsOn"] = True
+            if features & MediaPlayerEntityFeature.TURN_OFF:
+                new_props["SupportsOff"] = True
+            if features & MediaPlayerEntityFeature.VOLUME_SET:
+                new_props["SupportsSetVolume"] = True
+            if features & MediaPlayerEntityFeature.VOLUME_STEP:
+                new_props["SupportsVolumeStep"] = True
+            if features & MediaPlayerEntityFeature.VOLUME_MUTE:
+                new_props["SupportsVolumeMute"] = True
+            if features & MediaPlayerEntityFeature.PLAY_MEDIA:
+                new_props["SupportsPlayMedia"] = True
+            if features & MediaPlayerEntityFeature.PLAY:
+                new_props["SupportsPlay"] = True
+            if features & MediaPlayerEntityFeature.PAUSE:
+                new_props["SupportsPause"] = True
+            if features & MediaPlayerEntityFeature.SEEK:
+                new_props["SupportsSeek"] = True
+            if features & MediaPlayerEntityFeature.NEXT_TRACK:
+                new_props["SupportsNextTrack"] = True
+            if features & MediaPlayerEntityFeature.PREVIOUS_TRACK:
+                new_props["SupportsPreviousTrack"] = True
+            if features & MediaPlayerEntityFeature.STOP:
+                new_props["SupportsStop"] = True
+            if features & MediaPlayerEntityFeature.CLEAR_PLAYLIST:
+                new_props["SupportsClearPlaylist"] = True
+            if features & MediaPlayerEntityFeature.SHUFFLE_SET:
+                new_props["SupportsShuffle"] = True
+            if features & MediaPlayerEntityFeature.SELECT_SOUND_MODE:
+                new_props["SupportsSoundMode"] = True
+            if features & MediaPlayerEntityFeature.BROWSE_MEDIA:
+                new_props["SupportsBrowseMedia"] = True
+            if features & MediaPlayerEntityFeature.REPEAT_SET:
+                new_props["SupportsRepeat"] = True
+            if features & MediaPlayerEntityFeature.GROUPING:
+                new_props["SupportsGrouping"] = True
+            if features & MediaPlayerEntityFeature.MEDIA_ANNOUNCE:
+                new_props["SupportsMediaAnnounce"] = True
+            if features & MediaPlayerEntityFeature.MEDIA_ENQUEUE:
+                new_props["SupportsMediaEnqueue"] = True
+            if features & MediaPlayerEntityFeature.SELECT_SOURCE:
+                new_props["SupportsSelectSource"] = True
+
         device.replacePluginPropsOnServer(new_props)
         device.stateListOrDisplayStateIdChanged()
         self.entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
@@ -289,7 +408,7 @@ class Plugin(indigo.PluginBase):
 
         retList = []
         for entity_type, entity_list in self.ha_entity_map.items():
-            if entity_type not in ['binary_sensor', 'climate', 'cover', 'fan', 'light', 'sensor', 'switch']:
+            if entity_type not in ['binary_sensor', 'climate', 'cover', 'fan', 'light', 'sensor', 'switch', 'lock', 'media_player']:
                 retList.append((entity_type, entity_type))
         retList.sort(key=lambda tup: tup[1])
         self.logger.debug(f"get_entity_type_list: {retList = }")
@@ -297,10 +416,10 @@ class Plugin(indigo.PluginBase):
 
     def get_entity_list(self, filter="", valuesDict=None, typeId="", targetId=0):
         self.logger.debug(f"get_entity_list: {filter = }, {typeId = }, {valuesDict = }, {targetId = }")
-        if filter == "generic":
-            filter = valuesDict.get('entity_type', None)
-
         retList = []
+
+        if filter == "generic":
+            filter = valuesDict.get('entity_type')
         if not filter:
             return retList
 
@@ -333,9 +452,9 @@ class Plugin(indigo.PluginBase):
             return
 
         # save the entity state info in the entity map
-        if parts[0] not in self.ha_entity_map:
+        if parts[0] not in self.ha_entity_map:              # create the entity_type dict if it doesn't exist
             self.ha_entity_map[parts[0]] = {}
-        self.ha_entity_map[parts[0]][parts[1]] = entity
+        self.ha_entity_map[parts[0]][parts[1]] = entity     # save the entity info
 
         # find the matching Indigo device, update if we have one
 
@@ -565,10 +684,20 @@ class Plugin(indigo.PluginBase):
                 if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False, uiValue="Off")
                 else:
-                    speed_percentage = attributes.get("percentage", 0)
-                    speed_index = round(speed_percentage / speed_index_scale_factor)
+                    speed_index = round(attributes.get("percentage", 0) / speed_index_scale_factor)
                     device.updateStateOnServer("onOffState", value=True, uiValue="On")
                     device.updateStateOnServer("speedIndex", speed_index)
+
+        elif device.deviceTypeId == "ha_media_player":
+            device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+            device.updateStateOnServer("actual_state", value=entity["state"])
+            device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+
+            if entity["state"] == 'off':
+                device.updateStateOnServer("onOffState", value=False)
+            else:
+                device.updateStateOnServer("onOffState", value=True)
+                device.updateStateOnServer("brightnessLevel", value=round(attributes.get("volume_level", 0) * 100))
 
         elif device.deviceTypeId == "ha_generic":
             device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
@@ -588,53 +717,80 @@ class Plugin(indigo.PluginBase):
         if device.deviceTypeId == "HAswitchType":
             msg_data['domain'] = 'switch'
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                msg_data['service'] = 'turn_on'
+                msg_data['service'] = SERVICE_TURN_ON
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                msg_data['service'] = 'turn_off'
+                msg_data['service'] = SERVICE_TURN_OFF
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.Toggle:
-                msg_data['service'] = 'toggle'
+                msg_data['service'] = SERVICE_TOGGLE
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "HAdimmerType":
             msg_data['domain'] = 'light'
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                msg_data['service'] = 'turn_on'
+                msg_data['service'] = SERVICE_TURN_ON
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                msg_data['service'] = 'turn_off'
+                msg_data['service'] = SERVICE_TURN_OFF
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness:
-                msg_data['service'] = 'turn_on'
+                msg_data['service'] = SERVICE_TURN_ON
                 msg_data['service_data'] = {"brightness_pct": action.actionValue}
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "ha_cover":
             msg_data['domain'] = 'cover'
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                msg_data['service'] = 'open_cover'
+                msg_data['service'] = SERVICE_OPEN_COVER
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                msg_data['service'] = 'close_cover'
+                msg_data['service'] = SERVICE_CLOSE_COVER
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "ha_lock":
             msg_data['domain'] = 'lock'
             if action.deviceAction == indigo.kDeviceAction.TurnOn:
-                msg_data['service'] = 'lock'
+                msg_data['service'] = SERVICE_LOCK
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
-                msg_data['service'] = 'unlock'
+                msg_data['service'] = SERVICE_UNLOCK
                 self.send_ws(msg_data)
 
-    ########################################
+        if device.deviceTypeId == "ha_media_player":
+            msg_data['domain'] = 'media_player'
+            if action.deviceAction == indigo.kDeviceAction.TurnOn and device.pluginProps.get("SupportsOn"):
+                msg_data['service'] = SERVICE_TURN_ON
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff and device.pluginProps.get("SupportsOff"):
+                msg_data['service'] = SERVICE_TURN_OFF
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness and device.pluginProps.get("SupportsSetVolume"):
+                msg_data['service'] = SERVICE_VOLUME_SET
+                msg_data['service_data'] = {"volume_level": float(action.actionValue) / 100.0}
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.BrightenBy and device.pluginProps.get("SupportsSetVolume"):
+                msg_data['service'] = SERVICE_VOLUME_UP
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.DimBy and device.pluginProps.get("SupportsSetVolume"):
+                msg_data['service'] = SERVICE_VOLUME_DOWN
+                self.send_ws(msg_data)
+
+            else:
+                self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support {action.deviceAction}")
+
+
+########################################
     # Thermostat Action methods
     ########################################
     def actionControlThermostat(self, action, device):
@@ -683,15 +839,15 @@ class Plugin(indigo.PluginBase):
         speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
 
         if action.speedControlAction == indigo.kSpeedControlAction.TurnOn:
-            msg_data['service'] = 'turn_on'
+            msg_data['service'] = SERVICE_TURN_ON
             self.send_ws(msg_data)
 
         elif action.speedControlAction == indigo.kSpeedControlAction.TurnOff:
-            msg_data['service'] = 'turn_off'
+            msg_data['service'] = SERVICE_TURN_OFF
             self.send_ws(msg_data)
 
         elif action.speedControlAction == indigo.kSpeedControlAction.Toggle:
-            msg_data['service'] = 'turn_off' if device.onState else 'turn_on'
+            msg_data['service'] = SERVICE_TURN_OFF if device.onState else SERVICE_TURN_ON
             self.send_ws(msg_data)
 
         elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedLevel:
@@ -738,7 +894,7 @@ class Plugin(indigo.PluginBase):
         return True
 
     ########################################
-    # Action callbacks
+    # Climate (HVAC) Action callbacks
     ########################################
 
     def hvac_mode_list(self, filter, values_dict, type_id, target_id):
@@ -856,7 +1012,9 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"humidity": humidity}}
             self.send_ws(msg_data)
 
-    #   Cover entity actions
+    ########################################
+    # Cover  Action callbacks
+    ########################################
 
     def set_cover_position_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_cover_position_action for {device.address}")
@@ -900,7 +1058,9 @@ class Plugin(indigo.PluginBase):
                     'service': 'set_cover_tilt_position', 'service_data': {"position": plugin_action.props.get("tilt_position", 0)}}
         self.send_ws(msg_data)
 
-    #   Fan entity actions
+    ########################################
+    # Fan Action callbacks
+    ########################################
 
     def set_fan_direction_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_fan_direction_action for {device.address}")
@@ -927,6 +1087,175 @@ class Plugin(indigo.PluginBase):
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'fan',
                     'service': 'set_preset_mode', 'service_data': {"preset_mode": plugin_action.props.get("preset_mode")}}
+        self.send_ws(msg_data)
+
+    ########################################
+    # Media Player Action callbacks
+    ########################################
+
+    # Medium:
+    # toggle, media_play_pause, media_play, media_pause, media_stop
+    #
+    # Low:
+    # media_next_track, media_previous_track
+
+    def media_player_on_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_on_action for {device.address}")
+        if not device.pluginProps.get("SupportsOn"):
+            self.logger.warning(f"{device.name}: media_player_on_action: {device.address} does not support on action")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_TURN_ON}
+        self.send_ws(msg_data)
+
+    def media_player_off_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_off_action for {device.address}")
+        if not device.pluginProps.get("SupportsOn"):
+            self.logger.warning(f"{device.name}: media_player_off_action: {device.address} does not support off action")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_TURN_OFF}
+        self.send_ws(msg_data)
+
+    def media_player_set_volume_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_set_volume_action for {device.address}")
+        if not device.pluginProps.get("SupportsSetVolume"):
+            self.logger.warning(f"{device.name}: media_player_set_volume_action: {device.address} does not support set volume")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_VOLUME_SET, 'service_data': {"volume_level": float(plugin_action.props.get("volume", 0)) / 100.0}}
+        self.send_ws(msg_data)
+
+    def media_player_volume_up_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_volume_up_action for {device.address}")
+        if not device.pluginProps.get("SupportsVolumeStep"):
+            self.logger.warning(f"{device.name}: media_player_volume_up_action: {device.address} does not support set volume")
+            return
+        step = device.states.get("volumeStep", .1)
+        if not (current_volume := device.states.get("volume_level")):
+            self.logger.warning(f"{device.name}: media_player_volume_up_action: {device.address} has no volume_level")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_VOLUME_SET, 'service_data': {"volume_level": min(current_volume + step, 1)}}   # 1.0 is max volume
+        self.send_ws(msg_data)
+
+    def media_player_volume_down_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_volume_down_action for {device.address}")
+        if not device.pluginProps.get("SupportsVolumeStep"):
+            self.logger.warning(f"{device.name}: media_player_volume_down_action: {device.address} does not support set volume")
+            return
+        step = device.states.get("volumeStep", .1)
+        if not (current_volume := device.states.get("volume_level")):
+            self.logger.warning(f"{device.name}: media_player_volume_down_action: {device.address} has no volume_level")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_VOLUME_SET, 'service_data': {"volume_level": max(current_volume - step, 0)}}  # 0.0 is min volume
+        self.send_ws(msg_data)
+
+    def media_player_volume_mute_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_volume_mute_action for {device.address}")
+        if not device.pluginProps.get("SupportsVolumeMute"):
+            self.logger.warning(f"{device.name}: media_player_volume_mute_action: {device.address} does not support volume mute")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_VOLUME_MUTE, 'service_data': {"is_volume_muted": True}}
+        self.send_ws(msg_data)
+
+    def media_player_volume_unmute_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_volume_unmute_action for {device.address}")
+        if not device.pluginProps.get("SupportsVolumeMute"):
+            self.logger.warning(f"{device.name}: media_player_volume_unmute_action: {device.address} does not support volume mute")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_VOLUME_MUTE, 'service_data': {"is_volume_muted": False}}
+        self.send_ws(msg_data)
+
+    def media_play_set_source_action(self, plugin_action, device, callerWaitingForResult):
+        source = plugin_action.props.get("media_source")
+        self.logger.debug(f"{device.name}: media_play_set_source_action: {source} for {device.address}")
+        if not device.pluginProps.get("SupportsSelectSource"):
+            self.logger.warning(f"{device.name}: media_play_set_source_action: {device.address} does not support select source")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_SELECT_SOURCE, 'service_data': {"source": source}}
+        self.send_ws(msg_data)
+
+    def media_player_source_list(self, filter, values_dict, type_id, target_id):
+        self.logger.debug(f"media_player_source_list: type_id = {type_id}, target_id = {target_id}")
+        device = indigo.devices[target_id]
+        parts = device.address.split('.')
+        try:
+            entity = self.ha_entity_map[parts[0]][parts[1]]
+        except Exception as err:
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            return
+
+        if entity['attributes'].get('source_list'):
+            return [(preset, preset) for preset in entity['attributes']['source_list']]
+        else:
+            return []
+
+    def media_play_set_mode_action(self, plugin_action, device, callerWaitingForResult):
+        mode = plugin_action.props.get("media_mode")
+        self.logger.debug(f"{device.name}: media_play_set_mode_action: {mode} for {device.address}")
+        if not device.pluginProps.get("SupportsSelectSource"):
+            self.logger.warning(f"{device.name}: media_play_set_mode_action: {device.address} does not support select mode")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_SELECT_SOUND_MODE, 'service_data': {"sound_mode": mode}}
+        self.send_ws(msg_data)
+
+    def media_player_mode_list(self, filter, values_dict, type_id, target_id):
+        self.logger.debug(f"media_player_mode_list: type_id = {type_id}, target_id = {target_id}")
+        device = indigo.devices[target_id]
+        parts = device.address.split('.')
+        try:
+            entity = self.ha_entity_map[parts[0]][parts[1]]
+        except Exception as err:
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            return
+
+        if entity['attributes'].get('sound_mode_list'):
+            return [(preset, preset) for preset in entity['attributes']['sound_mode_list']]
+        else:
+            return []
+
+    def media_player_media_play_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_media_play_action for {device.address}")
+        if not device.pluginProps.get("SupportsPlay"):
+            self.logger.warning(f"{device.name}: media_player_media_play_action: {device.address} does not support play command")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_MEDIA_PLAY}
+        self.send_ws(msg_data)
+
+    def media_player_media_pause_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_media_pause_action for {device.address}")
+        if not device.pluginProps.get("SupportsPause"):
+            self.logger.warning(f"{device.name}: media_player_media_pause_action: {device.address} does not support pause command")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_MEDIA_PAUSE}
+        self.send_ws(msg_data)
+
+    def media_player_media_stop_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_media_stop_action for {device.address}")
+        if not device.pluginProps.get("SupportsPause"):
+            self.logger.warning(f"{device.name}: media_player_media_stop_action: {device.address} does not support stop command")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_MEDIA_STOP}
+        self.send_ws(msg_data)
+
+    def media_player_set_shuffle_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: media_player_set_shuffle_action for {device.address}")
+        set_shuffle = bool(plugin_action.props.get("shuffle", False))
+
+        if not device.pluginProps.get("SupportsShuffle"):
+            self.logger.warning(f"{device.name}: media_player_set_shuffle_action: {device.address} does not support shuffle")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
+                    'service': SERVICE_SHUFFLE_SET, 'service_data': {"shuffle": set_shuffle}}
         self.send_ws(msg_data)
 
     ################################################################################
