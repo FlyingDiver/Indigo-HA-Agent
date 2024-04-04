@@ -1340,73 +1340,43 @@ class Plugin(indigo.PluginBase):
             else:
                 self.logger.debug(f"Websocket got result for unknown message id: {msg['id']}")
 
-        elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'state_changed':
-            try:
-                self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
-            except Exception as e:
-                self.logger.error(f"Websocket state_changed exception: {e}")
-                self.logger.debug(f"Websocket state_changed:\n{msg}")
+        elif msg.get('type', None) == 'event':
 
-        elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
-            self.logger.debug(
-                f"lutron_caseta_button_event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
+            if msg['event'].get('event_type', None) == 'state_changed':
+                try:
+                    self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
+                except Exception as e:
+                    self.logger.error(f"Websocket state_changed exception: {e}")
+                    self.logger.debug(f"Websocket state_changed:\n{msg}")
 
-        elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'call_service':
-            data = msg['event']['data']
-            self.logger.debug(
-                f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
+            elif msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
+                self.logger.debug(f"lutron_caseta_button_event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
 
-        elif msg.get('type', None) == 'event' and msg['event'].get('event_type', None) == 'automation_triggered':
-            event = msg['event']
-            data = event['data']
-            self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
-            self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
+            elif msg['event'].get('event_type', None) == 'call_service':
+                data = msg['event']['data']
+                self.logger.debug(f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
 
-            _update_indigo_var("event_type", event.get('event_type', None), self.var_folder)
-            _update_indigo_var("event_time", event.get('time_fired', None), self.var_folder)
-            _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
-            _update_indigo_var("event_id", data.get('entity_id', None), self.var_folder)
-            _update_indigo_var("event_name", data.get('name', None), self.var_folder)
+            elif msg['event'].get('event_type', None) == 'automation_triggered':
+                event = msg['event']
+                data = event['data']
+                self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
+                self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
 
-            for trigger in indigo.triggers.iter("self"):
-                if trigger.pluginTypeId == "automationEvent":
-                    indigo.trigger.execute(trigger)
+                _update_indigo_var("event_type", event.get('event_type', None), self.var_folder)
+                _update_indigo_var("event_time", event.get('time_fired', None), self.var_folder)
+                _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
+                _update_indigo_var("event_id", data.get('entity_id', None), self.var_folder)
+                _update_indigo_var("event_name", data.get('name', None), self.var_folder)
 
-        # ignore these...  they are too noisy
-        elif (msg.get('type', None) == 'event' and
-              msg['event'].get('event_type', None) in [
-                  'recorder_5min_statistics_generated',
-                  'recorder_hourly_statistics_generated',
-                  'lovelace_updated',
-                  'device_registry_updated',
-                  'entity_registry_updated',
-                  'service_registered',
-                  'service_removed',
-                  'script_started',
-                  'component_loaded',
-                  'homeassistant_started',
-                  'homeassistant_start',
-                  'homeassistant_stop',
-                  'core_config_updated',
-                  'config_entry_discovered',
-                  'panels_updated',
-                  'area_registry_updated',
-                  'ios.became_active',
-                  'ios.finished_launching',
-                  'ios.entered_background',
-                  'ios.notification_action_fired',
-                  'mobile_app_notification_action',
-                  'automation_reloaded',
-                  'data_entry_flow_progressed',
-                  'ultrasync_zone_update',
-                  'insteon.button_on',
-                  'logging_changed',
-                  'lutron_event',
-              ]):
-            pass
+                for trigger in indigo.triggers.iter("self"):
+                    if trigger.pluginTypeId == "automationEvent":
+                        indigo.trigger.execute(trigger)
+
+            else:
+                self.logger.debug(f"Websocket unimplemented event: {json.dumps(msg['event'])}")
 
         else:
-            self.logger.warning(f"Websocket unknown message type: {json.dumps(msg)}")
+            self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
 
     def send_ws(self, msg_data):
         if not self.ws or not self.ws_connected:
