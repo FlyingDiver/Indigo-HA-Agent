@@ -206,6 +206,7 @@ class Plugin(indigo.PluginBase):
         self.logLevel = int(pluginPrefs.get("logLevel", logging.INFO))
         self.logger.debug(f"{self.logLevel=}")
         self.indigo_log_handler.setLevel(self.logLevel)
+        self.plugin_file_handler.setLevel(self.logLevel)
         self.pluginPrefs = pluginPrefs
 
         self.websocket_thread = None
@@ -458,9 +459,7 @@ class Plugin(indigo.PluginBase):
 
         # find the matching Indigo device, update if we have one
 
-        device_id = self.entity_devices.get(entity_id, None)
-        if not device_id:
-            self.logger.threaddebug(f"Ignoring update from entity `{entity_id}`, no matching Indigo device found")
+        if not (device_id := self.entity_devices.get(entity_id, None)):
             return
 
         device = indigo.devices[device_id]
@@ -471,7 +470,7 @@ class Plugin(indigo.PluginBase):
 
         attributes = entity.get("attributes", None)
         if not attributes:
-            self.logger.error(f"Device {device.name} no attributes")
+            self.logger.error(f"Device {device.name} has no attributes")
             return
 
         self.logger.debug(f"Updating device {device.name} with {entity}")
@@ -490,7 +489,7 @@ class Plugin(indigo.PluginBase):
                 states_list.append({'key': key, 'value': json.dumps(attributes[key])})
 
         if set(old_states) != set(new_states):
-            self.logger.debug(f"{device.name}: states list changed, updating...")
+            self.logger.threaddebug(f"{device.name}: states list changed, updating...")
             newProps = device.pluginProps
             newProps["states_list"] = new_states
             device.replacePluginPropsOnServer(newProps)
@@ -675,15 +674,14 @@ class Plugin(indigo.PluginBase):
                     device.updateStateImageOnServer(indigo.kStateImageSel.Open)
 
         elif device.deviceTypeId == "ha_fan":
-            device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
-            device.updateStateOnServer("actual_state", value=entity["state"])
-            device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
-
-            speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
             if entity["last_updated"] != device.states['lastUpdated']:
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
+                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
                 if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False, uiValue="Off")
                 else:
+                    speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
                     speed_index = round(attributes.get("percentage", 0) / speed_index_scale_factor)
                     device.updateStateOnServer("onOffState", value=True, uiValue="On")
                     device.updateStateOnServer("speedIndex", speed_index)
@@ -795,7 +793,7 @@ class Plugin(indigo.PluginBase):
     ########################################
     def actionControlThermostat(self, action, device):
         if action.thermostatAction == indigo.kThermostatAction.SetHvacMode:
-            self.logger.debug(f"{device.name}: newHVACmode: {action.actionMode} ({_lookup_action_str_from_hvac_mode(action.actionMode)})")
+            self.logger.debug(f"{device.name}: actionControlThermostat newHVACmode: {action.actionMode} ({_lookup_action_str_from_hvac_mode(action.actionMode)})")
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_hvac_mode',
                         'service_data': {"hvac_mode": _lookup_action_str_from_hvac_mode(action.actionMode)}}
             self.send_ws(msg_data)
@@ -825,16 +823,24 @@ class Plugin(indigo.PluginBase):
             self._handleChangeSetpointAction(device, newSetpoint, "setpointHeat")
 
         elif action.thermostatAction == indigo.kThermostatAction.SetFanMode:
-            self.logger.debug(f"{device.name}: fanMode: {action.actionMode} ({_lookup_action_str_from_fan_mode(action.actionMode)})")
+            self.logger.debug(f"{device.name}: actionControlThermostat fanMode: {action.actionMode} ({_lookup_action_str_from_fan_mode(action.actionMode)})")
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_fan_mode',
                         'service_data': {"fan_mode": _lookup_action_str_from_fan_mode(action.actionMode)}}
+            self.send_ws(msg_data)
+
+    # Process action request from Indigo Server to change a cool/heat setpoint.
+    def _handleChangeSetpointAction(self, device, newSetpoint, stateKey):
+        if stateKey in ["setpointCool", "setpointHeat"]:
+            self.logger.debug(f"{device.name}: actionControlThermostat _handleChangeSetpointAction: {stateKey} {newSetpoint:.1f}")
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_temperature',
+                        'service_data': {"temperature": newSetpoint}}
             self.send_ws(msg_data)
 
     ########################################
     # Speed Control Action callbacks
     ######################
     def actionControlSpeedControl(self, action, device):
-        self.logger.debug(f"{device.name}: sending {action.speedControlAction} ({action.actionValue}) to {device.address}")
+        self.logger.debug(f"{device.name}: actionControlSpeedControl sending {action.speedControlAction} ({action.actionValue}) to {device.address}")
         msg_data = {"type": "call_service", "domain": 'fan', "target": {"entity_id": device.address}}
         speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
 
@@ -873,13 +879,6 @@ class Plugin(indigo.PluginBase):
             self.send_ws(msg_data)
         self.logger.debug(f"{device.name}: sent {msg_data} to {device.address}")
 
-    # Process action request from Indigo Server to change a cool/heat setpoint.
-    def _handleChangeSetpointAction(self, device, newSetpoint, stateKey):
-        if stateKey in ["setpointCool", "setpointHeat"]:
-            self.logger.debug(f"{device.name}: _handleChangeSetpointAction: {stateKey} {newSetpoint:.1f}")
-            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_temperature',
-                        'service_data': {"temperature": newSetpoint}}
-            self.send_ws(msg_data)
 
     ########################################
     # Plugin Menu object callbacks
@@ -1327,7 +1326,6 @@ class Plugin(indigo.PluginBase):
 
         elif msg['type'] == 'result':
             if msg['id'] in self.sent_messages:
-                self.logger.debug(f"Websocket reply {'Success' if msg['success'] else 'Failed'} for {self.sent_messages[msg['id']]['type']}")
                 if not msg['success']:
                     self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
                 else:
@@ -1373,7 +1371,7 @@ class Plugin(indigo.PluginBase):
                         indigo.trigger.execute(trigger)
 
             else:
-                self.logger.debug(f"Websocket unimplemented event: {json.dumps(msg['event'])}")
+                self.logger.threaddebug(f"Websocket unimplemented event: {json.dumps(msg['event'])}")
 
         else:
             self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
