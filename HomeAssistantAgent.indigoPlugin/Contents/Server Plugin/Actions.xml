@@ -81,8 +81,17 @@
         </ConfigUI>
     </Action>
     <Action id="sep2" />
+    <Action id="set_fan_speed" deviceFilter="self.ha_fan">
+        <Name>Set Fan Speed</Name>
+        <CallbackMethod>set_fan_speed_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="speed" type="textfield" defaultValue="0">
+                <Label>Speed (%):</Label>
+        	</Field>
+        </ConfigUI>
+    </Action>
     <Action id="set_fan_direction" deviceFilter="self.ha_fan">
-        <Name>Set Direction</Name>
+        <Name>Set Fan Direction</Name>
         <CallbackMethod>set_fan_direction_action</CallbackMethod>
         <ConfigUI>
             <Field id="direction" type="menu" defaultValue="Off">
@@ -94,8 +103,8 @@
         	</Field>
         </ConfigUI>
     </Action>
-    <Action id="set_preset_mode" deviceFilter="self.ha_fan">
-        <Name>Set Preset Mode</Name>
+    <Action id="set_fan_preset_mode" deviceFilter="self.ha_fan">
+        <Name>Set Fan Preset Mode</Name>
         <CallbackMethod>set_fan_preset_mode_action</CallbackMethod>
         <ConfigUI>
             <Field id="preset_mode" type="menu">
@@ -104,7 +113,7 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="set_oscillate" deviceFilter="self.ha_fan">
+    <Action id="set_fan_oscillate" deviceFilter="self.ha_fan">
         <Name>Set Oscillate</Name>
         <CallbackMethod>set_fan_oscillate_action</CallbackMethod>
         <ConfigUI>

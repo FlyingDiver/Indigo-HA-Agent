@@ -738,7 +738,7 @@ class Plugin(indigo.PluginBase):
 
             elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness:
                 msg_data['service'] = SERVICE_TURN_ON
-                msg_data['service_data'] = {"brightness_pct": action.actionValue}
+                msg_data['service_data'] = {"brightness_pct": float(action.actionValue)}
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "ha_cover":
@@ -787,10 +787,10 @@ class Plugin(indigo.PluginBase):
             else:
                 self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support {action.deviceAction}")
 
-
-########################################
+    ########################################
     # Thermostat Action methods
     ########################################
+
     def actionControlThermostat(self, action, device):
         if action.thermostatAction == indigo.kThermostatAction.SetHvacMode:
             self.logger.debug(f"{device.name}: actionControlThermostat newHVACmode: {action.actionMode} ({_lookup_action_str_from_hvac_mode(action.actionMode)})")
@@ -878,7 +878,6 @@ class Plugin(indigo.PluginBase):
             msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
             self.send_ws(msg_data)
         self.logger.debug(f"{device.name}: sent {msg_data} to {device.address}")
-
 
     ########################################
     # Plugin Menu object callbacks
@@ -1060,6 +1059,12 @@ class Plugin(indigo.PluginBase):
     ########################################
     # Fan Action callbacks
     ########################################
+
+    def set_fan_speed_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: set_fan_speed_action for {device.address}")
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'fan',
+                    'service': 'set_percentage', 'service_data': {"percentage": plugin_action.props.get("speed", 0)}}
+        self.send_ws(msg_data)
 
     def set_fan_direction_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_fan_direction_action for {device.address}")
