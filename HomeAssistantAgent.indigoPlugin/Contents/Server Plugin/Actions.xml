@@ -1,57 +1,57 @@
 <?xml version="1.0"?>
 <Actions>
     <Action id="set_hvac_mode" deviceFilter="self.HAclimate">
-        <Name>Set HVAC Mode</Name>
+        <Name>Climate HVAC Mode</Name>
         <CallbackMethod>set_hvac_mode_action</CallbackMethod>
         <ConfigUI>
             <Field id="hvac_mode" type="menu">
-                <Label>HVAC Mode:</Label>
+                <Label>HVAC System Mode:</Label>
                  <List class="self" filter="" method="hvac_mode_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
     <Action id="set_hvac_fan_mode" deviceFilter="self.HAclimate">
-        <Name>Set Fan Mode</Name>
+        <Name>Climate Fan Mode</Name>
         <CallbackMethod>set_hvac_fan_mode_action</CallbackMethod>
         <ConfigUI>
             <Field id="fan_mode" type="menu">
-                <Label>Fan Mode:</Label>
+                <Label>HVAC Fan Mode:</Label>
                  <List class="self" filter="" method="hvac_fan_mode_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
     <Action id="set_hvac_swing_mode" deviceFilter="self.HAclimate">
-        <Name>Set Swing Mode</Name>
+        <Name>Climate Swing Mode</Name>
         <CallbackMethod>set_hvac_swing_mode_action</CallbackMethod>
         <ConfigUI>
             <Field id="hvac_swing_mode" type="menu">
-                <Label>Swing Mode:</Label>
+                <Label>HVAC Swing Mode:</Label>
                  <List class="self" filter="" method="hvac_swing_mode_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
     <Action id="set_hvac_preset_mode" deviceFilter="self.HAclimate">
-        <Name>Set Preset Mode</Name>
+        <Name>Climate Preset Mode</Name>
         <CallbackMethod>set_hvac_preset_mode_action</CallbackMethod>
         <ConfigUI>
             <Field id="hvac_preset_mode" type="menu">
-                <Label>Preset Mode:</Label>
+                <Label>Climate Preset Mode:</Label>
                  <List class="self" filter="" method="hvac_preset_mode_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
     <Action id="set_humidity" deviceFilter="self.HAclimate">
-        <Name>Set Humidity Target</Name>
+        <Name>Climate Humidity</Name>
         <CallbackMethod>set_humidity_action</CallbackMethod>
         <ConfigUI>
             <Field id="hvac_humidity" type="textfield" default="50">
-                <Label>Humidity:</Label>
+                <Label>Climate Humidity Setpoint:</Label>
             </Field>
         </ConfigUI>
     </Action>
     <Action id="sep1" />
     <Action id="set_cover_position" deviceFilter="self.ha_cover">
-        <Name>Set Cover Position</Name>
+        <Name>Cover Position</Name>
         <CallbackMethod>set_cover_position_action</CallbackMethod>
         <ConfigUI>
             <Field id="cover_position" type="textfield" default="0">
@@ -60,42 +60,42 @@
         </ConfigUI>
     </Action>
     <Action id="stop_cover" deviceFilter="self.ha_cover">
-        <Name>Stop Cover Movement</Name>
+        <Name>Cover Stop Movement</Name>
         <CallbackMethod>stop_cover_action</CallbackMethod>
     </Action>
     <Action id="open_cover_tilt" deviceFilter="self.ha_cover">
-        <Name>Open Cover Tilt</Name>
+        <Name>Cover Tilt Open</Name>
         <CallbackMethod>open_cover_tilt_action</CallbackMethod>
     </Action>
     <Action id="close_cover_tilt" deviceFilter="self.ha_cover">
-        <Name>Close Cover Tilt</Name>
+        <Name>Cover Tilt Close</Name>
         <CallbackMethod>close_cover_tilt_action</CallbackMethod>
     </Action>
     <Action id="set_cover_tilt" deviceFilter="self.ha_cover">
-        <Name>Set Cover Tilt</Name>
+        <Name>Cover Set Tilt</Name>
         <CallbackMethod>set_cover_tilt_action</CallbackMethod>
         <ConfigUI>
             <Field id="tilt_position" type="textfield" default="0">
-                <Label>Tilt Position (%):</Label>
+                <Label>Cover Tilt Position (%):</Label>
             </Field>
         </ConfigUI>
     </Action>
     <Action id="sep2" />
     <Action id="set_fan_speed" deviceFilter="self.ha_fan">
-        <Name>Set Fan Speed</Name>
+        <Name>Fan Set Speed</Name>
         <CallbackMethod>set_fan_speed_action</CallbackMethod>
         <ConfigUI>
             <Field id="speed" type="textfield" defaultValue="0">
-                <Label>Speed (%):</Label>
+                <Label>Fan Speed (%):</Label>
         	</Field>
         </ConfigUI>
     </Action>
     <Action id="set_fan_direction" deviceFilter="self.ha_fan">
-        <Name>Set Fan Direction</Name>
+        <Name>Fan Direction</Name>
         <CallbackMethod>set_fan_direction_action</CallbackMethod>
         <ConfigUI>
             <Field id="direction" type="menu" defaultValue="Off">
-        		<Label>Direction:</Label>
+        		<Label>Fan Direction:</Label>
         		<List>
         			<Option value="forward">Forward</Option>
         			<Option value="reverse">Reverse</Option>
@@ -104,21 +104,21 @@
         </ConfigUI>
     </Action>
     <Action id="set_fan_preset_mode" deviceFilter="self.ha_fan">
-        <Name>Set Fan Preset Mode</Name>
+        <Name>Fan Preset Mode</Name>
         <CallbackMethod>set_fan_preset_mode_action</CallbackMethod>
         <ConfigUI>
             <Field id="preset_mode" type="menu">
-                <Label>Preset Mode:</Label>
+                <Label>Fan Preset Mode:</Label>
                  <List class="self" filter="" method="preset_mode_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
     <Action id="set_fan_oscillate" deviceFilter="self.ha_fan">
-        <Name>Set Oscillate</Name>
+        <Name>Fan Oscillate</Name>
         <CallbackMethod>set_fan_oscillate_action</CallbackMethod>
         <ConfigUI>
             <Field id="oscillate" type="menu" defaultValue="Off">
-        		<Label>Oscillate:</Label>
+        		<Label>Fan Oscillate:</Label>
         		<List>
         			<Option value="0">Off</Option>
         			<Option value="1">On</Option>
@@ -203,7 +203,7 @@
     </Action>
     <Action id="sep10" />
     <Action id="send_generic_command" deviceFilter="self.ha_generic">
-        <Name>Send Generic Device Command</Name>
+        <Name>Generic Device Command</Name>
         <CallbackMethod>send_generic_command</CallbackMethod>
         <ConfigUI>
             <Field id="service_cmd" type="textfield" defaultValue="">
