@@ -1,2 +1,2 @@
-zeroconf==0.130.0
+pip3.11 install --only-binary=:all: zeroconf
 websocket-client==1.7.0

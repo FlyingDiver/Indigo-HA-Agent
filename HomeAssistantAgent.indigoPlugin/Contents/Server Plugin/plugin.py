@@ -671,7 +671,7 @@ class Plugin(indigo.PluginBase):
                     device.updateStateImageOnServer(indigo.kStateImageSel.Closed)
                 else:
                     device.updateStateOnServer("onOffState", value=True, uiValue=entity["state"].capitalize())
-                    device.updateStateImageOnServer(indigo.kStateImageSel.Open)
+                    device.updateStateImageOnServer(indigo.kStateImageSel.Opened)
 
         elif device.deviceTypeId == "ha_fan":
             if entity["last_updated"] != device.states['lastUpdated']:
