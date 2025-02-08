@@ -1,5 +1,10 @@
 <?xml version="1.0"?>
 <Actions>
+    <Action id="get_states">
+        <Name>Request Update for All Entities</Name>
+        <CallbackMethod>get_states</CallbackMethod>
+    </Action>
+    <Action id="sep0" />
     <Action id="set_hvac_mode" deviceFilter="self.HAclimate">
         <Name>Climate HVAC Mode</Name>
         <CallbackMethod>set_hvac_mode_action</CallbackMethod>

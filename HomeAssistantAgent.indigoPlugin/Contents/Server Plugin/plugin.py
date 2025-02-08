@@ -8,6 +8,7 @@ import threading
 import websocket
 from enum import IntFlag
 from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
+from queue import Queue
 
 
 def _update_indigo_var(name, value, folder):
@@ -164,14 +165,12 @@ SERVICE_MEDIA_SEEK = "media_seek"
 SERVICE_REPEAT_SET = "repeat_set"
 SERVICE_SHUFFLE_SET = "shuffle_set"
 
-
 SERVICE_CLEAR_PLAYLIST = "clear_playlist"
 SERVICE_JOIN = "join"
 SERVICE_PLAY_MEDIA = "play_media"
 SERVICE_SELECT_SOUND_MODE = "select_sound_mode"
 SERVICE_SELECT_SOURCE = "select_source"
 SERVICE_UNJOIN = "unjoin"
-
 
 SERVICE_LOCK = "lock"
 SERVICE_UNLOCK = "unlock"
@@ -218,8 +217,18 @@ class Plugin(indigo.PluginBase):
         self.sent_messages = {}
         self.last_sent_id = 0
         self.ha_entity_map = {}
+        self.message_queue = Queue()
 
     ########################################
+
+    def runConcurrentThread(self):
+        try:
+            while True:
+                self.processMessages()
+                self.sleep(0.1)
+
+        except self.StopThread:
+            pass
 
     def startup(self):
         self.logger.debug("startup called")
@@ -386,7 +395,7 @@ class Plugin(indigo.PluginBase):
             self.indigo_log_handler.setLevel(self.logLevel)
             self.logger.debug(f"logLevel = {self.logLevel}")
             haToken = valuesDict.get('haToken')
-            if haToken and len(haToken):
+            if haToken and len(haToken) and not self.ws:
                 self.start_websocket()
 
     def found_server_list(self, filter=None, valuesDict=None, typeId=0, targetId=0):
@@ -453,9 +462,9 @@ class Plugin(indigo.PluginBase):
             return
 
         # save the entity state info in the entity map
-        if parts[0] not in self.ha_entity_map:              # create the entity_type dict if it doesn't exist
+        if parts[0] not in self.ha_entity_map:  # create the entity_type dict if it doesn't exist
             self.ha_entity_map[parts[0]] = {}
-        self.ha_entity_map[parts[0]][parts[1]] = entity     # save the entity info
+        self.ha_entity_map[parts[0]][parts[1]] = entity  # save the entity info
 
         # find the matching Indigo device, update if we have one
 
@@ -763,12 +772,12 @@ class Plugin(indigo.PluginBase):
 
         if device.deviceTypeId == "ha_media_player":
             msg_data['domain'] = 'media_player'
-            if action.deviceAction == indigo.kDeviceAction.TurnOn and device.pluginProps.get("SupportsOn"):
-                msg_data['service'] = SERVICE_TURN_ON
+            if action.deviceAction == indigo.kDeviceAction.TurnOn and device.pluginProps.get("SupportsPlay"):
+                msg_data['service'] = SERVICE_MEDIA_PLAY
                 self.send_ws(msg_data)
 
-            elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff and device.pluginProps.get("SupportsOff"):
-                msg_data['service'] = SERVICE_TURN_OFF
+            elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff and device.pluginProps.get("SupportsPause"):
+                msg_data['service'] = SERVICE_MEDIA_PAUSE
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness and device.pluginProps.get("SupportsSetVolume"):
@@ -776,11 +785,11 @@ class Plugin(indigo.PluginBase):
                 msg_data['service_data'] = {"volume_level": float(action.actionValue) / 100.0}
                 self.send_ws(msg_data)
 
-            elif action.deviceAction == indigo.kDimmerRelayAction.BrightenBy and device.pluginProps.get("SupportsSetVolume"):
+            elif action.deviceAction == indigo.kDimmerRelayAction.BrightenBy and device.pluginProps.get("SupportsVolumeStep"):
                 msg_data['service'] = SERVICE_VOLUME_UP
                 self.send_ws(msg_data)
 
-            elif action.deviceAction == indigo.kDimmerRelayAction.DimBy and device.pluginProps.get("SupportsSetVolume"):
+            elif action.deviceAction == indigo.kDimmerRelayAction.DimBy and device.pluginProps.get("SupportsVolumeStep"):
                 msg_data['service'] = SERVICE_VOLUME_DOWN
                 self.send_ws(msg_data)
 
@@ -793,7 +802,8 @@ class Plugin(indigo.PluginBase):
 
     def actionControlThermostat(self, action, device):
         if action.thermostatAction == indigo.kThermostatAction.SetHvacMode:
-            self.logger.debug(f"{device.name}: actionControlThermostat newHVACmode: {action.actionMode} ({_lookup_action_str_from_hvac_mode(action.actionMode)})")
+            self.logger.debug(
+                f"{device.name}: actionControlThermostat newHVACmode: {action.actionMode} ({_lookup_action_str_from_hvac_mode(action.actionMode)})")
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_hvac_mode',
                         'service_data': {"hvac_mode": _lookup_action_str_from_hvac_mode(action.actionMode)}}
             self.send_ws(msg_data)
@@ -823,7 +833,8 @@ class Plugin(indigo.PluginBase):
             self._handleChangeSetpointAction(device, newSetpoint, "setpointHeat")
 
         elif action.thermostatAction == indigo.kThermostatAction.SetFanMode:
-            self.logger.debug(f"{device.name}: actionControlThermostat fanMode: {action.actionMode} ({_lookup_action_str_from_fan_mode(action.actionMode)})")
+            self.logger.debug(
+                f"{device.name}: actionControlThermostat fanMode: {action.actionMode} ({_lookup_action_str_from_fan_mode(action.actionMode)})")
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_fan_mode',
                         'service_data': {"fan_mode": _lookup_action_str_from_fan_mode(action.actionMode)}}
             self.send_ws(msg_data)
@@ -887,7 +898,7 @@ class Plugin(indigo.PluginBase):
         self.logger.info(f"\n{json.dumps(self.ha_entity_map, sort_keys=True, indent=4, separators=(',', ': '))}")
         return True
 
-    def get_states(self):
+    def get_states(self, *args):
         self.send_ws({"type": 'get_states'})
         return True
 
@@ -1097,15 +1108,9 @@ class Plugin(indigo.PluginBase):
     # Media Player Action callbacks
     ########################################
 
-    # Medium:
-    # toggle, media_play_pause, media_play, media_pause, media_stop
-    #
-    # Low:
-    # media_next_track, media_previous_track
-
     def media_player_on_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_on_action for {device.address}")
-        if not device.pluginProps.get("SupportsOn"):
+        if not device.pluginProps.get("SupportsOn", None):
             self.logger.warning(f"{device.name}: media_player_on_action: {device.address} does not support on action")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1114,7 +1119,7 @@ class Plugin(indigo.PluginBase):
 
     def media_player_off_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_off_action for {device.address}")
-        if not device.pluginProps.get("SupportsOn"):
+        if not device.pluginProps.get("SupportsOn", None):
             self.logger.warning(f"{device.name}: media_player_off_action: {device.address} does not support off action")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1123,7 +1128,7 @@ class Plugin(indigo.PluginBase):
 
     def media_player_set_volume_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_set_volume_action for {device.address}")
-        if not device.pluginProps.get("SupportsSetVolume"):
+        if not device.pluginProps.get("SupportsSetVolume", None):
             self.logger.warning(f"{device.name}: media_player_set_volume_action: {device.address} does not support set volume")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1132,21 +1137,21 @@ class Plugin(indigo.PluginBase):
 
     def media_player_volume_up_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_volume_up_action for {device.address}")
-        if not device.pluginProps.get("SupportsVolumeStep"):
-            self.logger.warning(f"{device.name}: media_player_volume_up_action: {device.address} does not support set volume")
+        if not device.pluginProps.get("SupportsVolumeStep", None):
+            self.logger.warning(f"{device.name}: media_player_volume_up_action: {device.address} does not support volume step")
             return
         step = device.states.get("volumeStep", .1)
         if not (current_volume := device.states.get("volume_level")):
             self.logger.warning(f"{device.name}: media_player_volume_up_action: {device.address} has no volume_level")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
-                    'service': SERVICE_VOLUME_SET, 'service_data': {"volume_level": min(current_volume + step, 1)}}   # 1.0 is max volume
+                    'service': SERVICE_VOLUME_SET, 'service_data': {"volume_level": min(current_volume + step, 1)}}  # 1.0 is max volume
         self.send_ws(msg_data)
 
     def media_player_volume_down_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_volume_down_action for {device.address}")
-        if not device.pluginProps.get("SupportsVolumeStep"):
-            self.logger.warning(f"{device.name}: media_player_volume_down_action: {device.address} does not support set volume")
+        if not device.pluginProps.get("SupportsVolumeStep", None):
+            self.logger.warning(f"{device.name}: media_player_volume_down_action: {device.address} does not support volume step")
             return
         step = device.states.get("volumeStep", .1)
         if not (current_volume := device.states.get("volume_level")):
@@ -1158,7 +1163,7 @@ class Plugin(indigo.PluginBase):
 
     def media_player_volume_mute_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_volume_mute_action for {device.address}")
-        if not device.pluginProps.get("SupportsVolumeMute"):
+        if not device.pluginProps.get("SupportsVolumeMute", None):
             self.logger.warning(f"{device.name}: media_player_volume_mute_action: {device.address} does not support volume mute")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1167,7 +1172,7 @@ class Plugin(indigo.PluginBase):
 
     def media_player_volume_unmute_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_volume_unmute_action for {device.address}")
-        if not device.pluginProps.get("SupportsVolumeMute"):
+        if not device.pluginProps.get("SupportsVolumeMute", None):
             self.logger.warning(f"{device.name}: media_player_volume_unmute_action: {device.address} does not support volume mute")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1177,7 +1182,7 @@ class Plugin(indigo.PluginBase):
     def media_play_set_source_action(self, plugin_action, device, callerWaitingForResult):
         source = plugin_action.props.get("media_source")
         self.logger.debug(f"{device.name}: media_play_set_source_action: {source} for {device.address}")
-        if not device.pluginProps.get("SupportsSelectSource"):
+        if not device.pluginProps.get("SupportsSelectSource", None):
             self.logger.warning(f"{device.name}: media_play_set_source_action: {device.address} does not support select source")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1202,7 +1207,7 @@ class Plugin(indigo.PluginBase):
     def media_play_set_mode_action(self, plugin_action, device, callerWaitingForResult):
         mode = plugin_action.props.get("media_mode")
         self.logger.debug(f"{device.name}: media_play_set_mode_action: {mode} for {device.address}")
-        if not device.pluginProps.get("SupportsSelectSource"):
+        if not device.pluginProps.get("SupportsSelectSource", None):
             self.logger.warning(f"{device.name}: media_play_set_mode_action: {device.address} does not support select mode")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1226,7 +1231,7 @@ class Plugin(indigo.PluginBase):
 
     def media_player_media_play_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_media_play_action for {device.address}")
-        if not device.pluginProps.get("SupportsPlay"):
+        if not device.pluginProps.get("SupportsPlay", None):
             self.logger.warning(f"{device.name}: media_player_media_play_action: {device.address} does not support play command")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1235,7 +1240,7 @@ class Plugin(indigo.PluginBase):
 
     def media_player_media_pause_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_media_pause_action for {device.address}")
-        if not device.pluginProps.get("SupportsPause"):
+        if not device.pluginProps.get("SupportsPause", None):
             self.logger.warning(f"{device.name}: media_player_media_pause_action: {device.address} does not support pause command")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1244,7 +1249,7 @@ class Plugin(indigo.PluginBase):
 
     def media_player_media_stop_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_media_stop_action for {device.address}")
-        if not device.pluginProps.get("SupportsPause"):
+        if not device.pluginProps.get("SupportsStop", None):
             self.logger.warning(f"{device.name}: media_player_media_stop_action: {device.address} does not support stop command")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1255,7 +1260,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(f"{device.name}: media_player_set_shuffle_action for {device.address}")
         set_shuffle = bool(plugin_action.props.get("shuffle", False))
 
-        if not device.pluginProps.get("SupportsShuffle"):
+        if not device.pluginProps.get("SupportsShuffle", None):
             self.logger.warning(f"{device.name}: media_player_set_shuffle_action: {device.address} does not support shuffle")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1309,87 +1314,8 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(f"Websocket connection successful")
 
     def on_message(self, ws, message):
-        self.logger.threaddebug(f"Websocket on_message: {message}")
         msg = json.loads(message)
-
-        if msg['type'] == 'auth_required':
-            self.logger.debug(f"Websocket got auth_required for ha_version {msg['ha_version']}, sending auth_token")
-            self.ws.send(json.dumps({'type': 'auth', 'access_token': self.pluginPrefs.get('haToken')}))
-
-        elif msg['type'] == 'auth_ok':
-            self.logger.debug(f"Websocket got auth_ok for ha_version {msg['ha_version']}")
-            self.ws_connected = True
-
-            # subscribe to events
-            self.send_ws({"type": 'subscribe_events'})
-
-            # get states to populate devices, and build a list of the current home assistant entities
-            self.send_ws({"type": 'get_states'})
-
-        elif msg['type'] == 'auth_invalid':
-            self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
-
-        elif msg['type'] == 'result':
-            if msg['id'] in self.sent_messages:
-                if not msg['success']:
-                    self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
-                else:
-                    if self.sent_messages[msg['id']]['type'] == "get_states":
-                        for entity in msg['result']:
-                            self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
-                            self.entity_update(entity['entity_id'], entity, force_update=True)
-                del self.sent_messages[msg['id']]
-
-            else:
-                self.logger.debug(f"Websocket got result for unknown message id: {msg['id']}")
-
-        elif msg.get('type', None) == 'event':
-
-            if msg['event'].get('event_type', None) == 'state_changed':
-                try:
-                    self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
-                except Exception as e:
-                    self.logger.error(f"Websocket state_changed exception: {e}")
-                    self.logger.debug(f"Websocket state_changed:\n{msg}")
-
-            elif msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
-                self.logger.debug(f"lutron_caseta_button_event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
-
-            elif msg['event'].get('event_type', None) == 'call_service':
-                data = msg['event']['data']
-                self.logger.debug(f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
-
-            elif msg['event'].get('event_type', None) == 'automation_triggered':
-                event = msg['event']
-                data = event['data']
-                self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
-                self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
-
-                _update_indigo_var("event_type", event.get('event_type', None), self.var_folder)
-                _update_indigo_var("event_time", event.get('time_fired', None), self.var_folder)
-                _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
-                _update_indigo_var("event_id", data.get('entity_id', None), self.var_folder)
-                _update_indigo_var("event_name", data.get('name', None), self.var_folder)
-
-                for trigger in indigo.triggers.iter("self"):
-                    if trigger.pluginTypeId == "automationEvent":
-                        indigo.trigger.execute(trigger)
-
-            else:
-                self.logger.threaddebug(f"Websocket unimplemented event: {json.dumps(msg['event'])}")
-
-        else:
-            self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
-
-    def send_ws(self, msg_data):
-        if not self.ws or not self.ws_connected:
-            self.logger.error(f"Websocket not connected, cannot send: {msg_data}")
-            return
-
-        self.last_sent_id += 1
-        msg_data['id'] = self.last_sent_id
-        self.ws.send(json.dumps(msg_data))
-        self.sent_messages[self.last_sent_id] = msg_data
+        self.message_queue.put(msg)
 
     def on_close(self, ws, close_status_code, close_msg):
         self.logger.warning(f"Websocket closed: {close_status_code} {close_msg}")
@@ -1404,3 +1330,96 @@ class Plugin(indigo.PluginBase):
 
         # try to restart the websocket
         self.start_websocket(delay=5)
+
+    ################################################################################
+
+    def processMessages(self):
+
+        while not self.message_queue.empty():
+            self.logger.debug(f"processMessages: {self.message_queue.qsize()} messages in queue")
+            msg = self.message_queue.get()
+            if not msg:
+                return
+
+            self.logger.threaddebug(f"Websocket on_message: {json.dumps(msg, indent=4, sort_keys=True)}")
+
+            if msg['type'] == 'auth_required':
+                self.logger.debug(f"Websocket got auth_required for ha_version {msg['ha_version']}, sending auth_token")
+                self.ws.send(json.dumps({'type': 'auth', 'access_token': self.pluginPrefs.get('haToken')}))
+
+            elif msg['type'] == 'auth_ok':
+                self.logger.debug(f"Websocket got auth_ok for ha_version {msg['ha_version']}")
+                self.ws_connected = True
+
+                # subscribe to events
+                self.send_ws({"type": 'subscribe_events'})
+
+                # get states to populate devices, and build a list of the current home assistant entities
+                self.send_ws({"type": 'get_states'})
+
+            elif msg['type'] == 'auth_invalid':
+                self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
+
+            elif msg['type'] == 'result':
+                if msg['id'] in self.sent_messages:
+                    if not msg['success']:
+                        self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
+                    else:
+                        if self.sent_messages[msg['id']]['type'] == "get_states":
+                            for entity in msg['result']:
+                                self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
+                                self.entity_update(entity['entity_id'], entity, force_update=True)
+                    del self.sent_messages[msg['id']]
+
+                else:
+                    self.logger.debug(f"Websocket got result for unknown message id: {msg['id']}")
+
+            elif msg.get('type', None) == 'event':
+
+                if msg['event'].get('event_type', None) == 'state_changed':
+                    try:
+                        self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
+                    except Exception as e:
+                        self.logger.error(f"Websocket state_changed exception: {e}")
+                        self.logger.debug(f"Websocket state_changed:\n{msg}")
+
+                elif msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
+                    self.logger.debug(
+                        f"lutron_caseta_button_event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
+
+                elif msg['event'].get('event_type', None) == 'call_service':
+                    data = msg['event']['data']
+                    self.logger.debug(
+                        f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
+
+                elif msg['event'].get('event_type', None) == 'automation_triggered':
+                    event = msg['event']
+                    data = event['data']
+                    self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
+                    self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
+
+                    _update_indigo_var("event_type", event.get('event_type', None), self.var_folder)
+                    _update_indigo_var("event_time", event.get('time_fired', None), self.var_folder)
+                    _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
+                    _update_indigo_var("event_id", data.get('entity_id', None), self.var_folder)
+                    _update_indigo_var("event_name", data.get('name', None), self.var_folder)
+
+                    for trigger in indigo.triggers.iter("self"):
+                        if trigger.pluginTypeId == "automationEvent":
+                            indigo.trigger.execute(trigger)
+
+                else:
+                    self.logger.threaddebug(f"Websocket unimplemented event: {json.dumps(msg['event'])}")
+
+            else:
+                self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
+
+    def send_ws(self, msg_data):
+        if not self.ws or not self.ws_connected:
+            self.logger.error(f"Websocket not connected, cannot send: {msg_data}")
+            return
+
+        self.last_sent_id += 1
+        msg_data['id'] = self.last_sent_id
+        self.ws.send(json.dumps(msg_data))
+        self.sent_messages[self.last_sent_id] = msg_data

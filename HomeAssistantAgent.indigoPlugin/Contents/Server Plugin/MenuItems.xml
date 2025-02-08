@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <MenuItems>
     <MenuItem id="get_states">
-        <Name>Update Devices</Name>
+        <Name>Update HA Entity Info</Name>
         <CallbackMethod>get_states</CallbackMethod>
     </MenuItem>
     <MenuItem id="dumpEntities">
