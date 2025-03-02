@@ -5,6 +5,18 @@
         <CallbackMethod>get_states</CallbackMethod>
     </Action>
     <Action id="sep0" />
+        <Action id="run_automation">
+        <Name>Run Automation</Name>
+        <CallbackMethod>run_automation_command</CallbackMethod>
+        <ConfigUI>
+			<Field id="automation_id" type="menu">
+                <Label>Automation Entity:</Label>
+                <List class="self" method="get_entity_list" filter="automation" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="sep11" />
     <Action id="set_hvac_mode" deviceFilter="self.HAclimate">
         <Name>Climate HVAC Mode</Name>
         <CallbackMethod>set_hvac_mode_action</CallbackMethod>

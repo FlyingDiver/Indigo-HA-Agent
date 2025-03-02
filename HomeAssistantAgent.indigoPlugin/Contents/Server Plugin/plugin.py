@@ -1269,6 +1269,15 @@ class Plugin(indigo.PluginBase):
 
     ################################################################################
 
+    def run_automation_command(self, plugin_action, callerWaitingForResult):
+        self.logger.debug(f"run_automation_command: {plugin_action.props}")
+        if automation_id := plugin_action.props.get("automation_id", None):
+            msg_data = {"type": "call_service", 'domain': 'automation', 'service': 'trigger',
+                        'service_data': {"entity_id": automation_id}}
+            self.send_ws(msg_data)
+        else:
+            self.logger.warning(f"{device.name}: run_automation_command: missing automation_id")
+
     def send_generic_command(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: send_generic_command for {device.address}, {plugin_action.props}")
 
