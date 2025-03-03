@@ -218,6 +218,7 @@
             </Field>
         </ConfigUI>
     </Action>
+    <!--
     <Action id="sep10" />
     <Action id="send_generic_command" deviceFilter="self.ha_generic">
         <Name>Generic Device Command</Name>
@@ -234,5 +235,5 @@
             </Field>
         </ConfigUI>
     </Action>
-
+-->
 </Actions>
