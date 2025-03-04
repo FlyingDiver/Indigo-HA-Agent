@@ -5,7 +5,7 @@
         <CallbackMethod>get_states</CallbackMethod>
     </Action>
     <Action id="sep0" />
-        <Action id="run_automation">
+    <Action id="run_automation">
         <Name>Run Automation</Name>
         <CallbackMethod>run_automation_command</CallbackMethod>
         <ConfigUI>
@@ -13,6 +13,34 @@
                 <Label>Automation Entity:</Label>
                 <List class="self" method="get_entity_list" filter="automation" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_text">
+        <Name>Set Text</Name>
+        <CallbackMethod>set_text_command</CallbackMethod>
+        <ConfigUI>
+			<Field id="entity_id" type="menu">
+                <Label>Text Entity:</Label>
+                <List class="self" method="get_entity_list" filter="input_text" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+            <Field id="text" type="textfield" default="50">
+                <Label>Text String:</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="run_number">
+        <Name>Set Number</Name>
+        <CallbackMethod>set_number_command</CallbackMethod>
+        <ConfigUI>
+			<Field id="entity_id" type="menu">
+                <Label>Number Entity:</Label>
+                <List class="self" method="get_entity_list" filter="input_number" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+            <Field id="number" type="textfield" default="50">
+                <Label>Number:</Label>
             </Field>
         </ConfigUI>
     </Action>
@@ -218,22 +246,4 @@
             </Field>
         </ConfigUI>
     </Action>
-    <!--
-    <Action id="sep10" />
-    <Action id="send_generic_command" deviceFilter="self.ha_generic">
-        <Name>Generic Device Command</Name>
-        <CallbackMethod>send_generic_command</CallbackMethod>
-        <ConfigUI>
-            <Field id="service_cmd" type="textfield" defaultValue="">
-        		<Label>Service Command:</Label>
-        	</Field>
-            <Field id="service_data" type="textfield" defaultValue="">
-        		<Label>Service Data:</Label>
-        	</Field>
-            <Field id="service_data_note" type="label" fontSize="small" fontColor="darkgray">
-                <Label>Variable and Device State Substitution is enabled for all fields. Use the format %%v:12345%% for variables and %%d:12345:someStateId%% for device states.</Label>
-            </Field>
-        </ConfigUI>
-    </Action>
--->
 </Actions>

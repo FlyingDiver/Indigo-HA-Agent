@@ -1278,20 +1278,23 @@ class Plugin(indigo.PluginBase):
         else:
             self.logger.warning(f"{device.name}: run_automation_command: missing automation_id")
 
-    def send_generic_command(self, plugin_action, device, callerWaitingForResult):
-        self.logger.debug(f"{device.name}: send_generic_command for {device.address}, {plugin_action.props}")
-
-        domain = device.address.split('.')[0]
-        service = self.substitute(plugin_action.props.get("service_cmd", None))
-        service_data = json.loads(self.substitute(plugin_action.props.get("service_data", None)))
-        self.logger.debug(f"{device.name}: send_generic_command: {domain=} {service=} {service_data=}")
-        if domain and service and service_data:
-            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': domain,
-                        'service': service, 'service_data': service_data}
+    def set_text_command(self, plugin_action, callerWaitingForResult):
+        self.logger.debug(f"set_text_command: {plugin_action.props}")
+        if entity_id := plugin_action.props.get("entity_id"):
+            msg_data = {"type": "call_service", 'domain': 'input_text', 'service': 'set_value',
+                        'service_data': {"entity_id": entity_id, "value": self.substitute(plugin_action.props.get("text"))}}
             self.send_ws(msg_data)
         else:
-            self.logger.warning(f"{device.name}: send_generic_command: missing domain, service, or service_data")
-            return
+            self.logger.warning(f"{device.name}: set_text_command: missing entity_id")
+
+    def set_number_command(self, plugin_action, callerWaitingForResult):
+        self.logger.debug(f"run_automation_command: {plugin_action.props}")
+        if entity_id := plugin_action.props.get("entity_id", None):
+            msg_data = {"type": "call_service", 'domain': 'input_number', 'service': 'set_value',
+                        'service_data': {"entity_id": entity_id, "value": self.substitute(plugin_action.props.get("number"))}}
+            self.send_ws(msg_data)
+        else:
+            self.logger.warning(f"{device.name}: set_number_command: missing entity_id")
 
     ################################################################################
     # Minimal Websocket Client
