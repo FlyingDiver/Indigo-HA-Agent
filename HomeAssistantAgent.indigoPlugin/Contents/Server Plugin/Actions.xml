@@ -246,4 +246,14 @@
             </Field>
         </ConfigUI>
     </Action>
+    <Action id="sonos_play_favorite" deviceFilter="self.ha_media_player">
+        <Name>Sonos Play Favorite</Name>
+        <CallbackMethod>sonos_play_favorite_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="favorite" type="menu">
+                <Label>Favorite:</Label>
+                 <List class="self" filter="" method="sonos_favorite_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
 </Actions>

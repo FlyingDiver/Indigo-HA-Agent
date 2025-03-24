@@ -1267,6 +1267,31 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_SHUFFLE_SET, 'service_data': {"shuffle": set_shuffle}}
         self.send_ws(msg_data)
 
+    def sonos_play_favorite_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: sonos_play_favorite_action for {device.address}, {plugin_action.props['favorite']}")
+
+        msg_data = {"type": "call_service",
+                    'domain': 'media_player',
+                    "target": {"entity_id": device.address},
+                    'service': SERVICE_PLAY_MEDIA,
+                    'service_data': {'media_content_type': 'favorite_item_id',
+                                     'media_content_id': plugin_action.props['favorite']}}
+
+        self.send_ws(msg_data)
+
+    def sonos_favorite_list(self, filter, values_dict, type_id, target_id):
+        self.logger.debug(f"sonos_favorite_list: type_id = {type_id}, target_id = {target_id}")
+        try:
+            entity = self.ha_entity_map["sensor"]["sonos_favorites"]
+        except Exception as err:
+            self.logger.warning(f"sensor.sonos_favorites not found")
+            return []
+
+        if entity['attributes'].get('items'):
+            return [(k, v) for k, v in entity['attributes']['items'].items()]
+        else:
+            return []
+
     ################################################################################
 
     def run_automation_command(self, plugin_action, callerWaitingForResult):
@@ -1374,6 +1399,9 @@ class Plugin(indigo.PluginBase):
 
             elif msg['type'] == 'result':
                 if msg['id'] in self.sent_messages:
+                    sent = self.sent_messages[msg['id']]
+                    if sent.get('report', False):
+                        self.logger.debug(f"Websocket result for {msg['id']}: {json.dumps(msg, indent=4, sort_keys=True)}")
                     if not msg['success']:
                         self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
                     else:
@@ -1426,12 +1454,15 @@ class Plugin(indigo.PluginBase):
             else:
                 self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
 
-    def send_ws(self, msg_data):
+    def send_ws(self, msg_data, report=False):
         if not self.ws or not self.ws_connected:
             self.logger.error(f"Websocket not connected, cannot send: {msg_data}")
             return
 
         self.last_sent_id += 1
         msg_data['id'] = self.last_sent_id
+        if report:
+            self.logger.debug(f"send_ws: {json.dumps(msg_data, indent=4, sort_keys=True)}")
         self.ws.send(json.dumps(msg_data))
+        msg_data['report'] = report
         self.sent_messages[self.last_sent_id] = msg_data
