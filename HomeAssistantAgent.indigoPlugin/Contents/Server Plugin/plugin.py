@@ -906,6 +906,23 @@ class Plugin(indigo.PluginBase):
     # Climate (HVAC) Action callbacks
     ########################################
 
+    def do_climate_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: do_climate_action: {plugin_action.props}")
+        action = plugin_action.props.get("action", None)
+        if action:
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': action}
+            if action == "set_temperature":
+                msg_data['service_data'] = {"temperature": plugin_action.props.get("temperature", 0)}
+            elif action == "set_hvac_mode":
+                msg_data['service_data'] = {"hvac_mode": plugin_action.props.get("hvac_mode", "")}
+            elif action == "set_fan_mode":
+                msg_data['service_data'] = {"fan_mode": plugin_action.props.get("fan_mode", "")}
+            elif action == "set_swing_mode":
+                msg_data['service_data'] = {"swing_mode": plugin_action.props.get("hvac_swing_mode", "")}
+            elif action == "set_preset_mode":
+                msg_data['service_data'] = {"preset_mode": plugin_action.props.get("hvac_preset_mode", "")}
+            self.send_ws(msg_data)
+
     def hvac_mode_list(self, filter, values_dict, type_id, target_id):
         self.logger.debug(f"hvac_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
@@ -1025,6 +1042,17 @@ class Plugin(indigo.PluginBase):
     # Cover  Action callbacks
     ########################################
 
+    def do_cover_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: do_cover_action: {plugin_action.props}")
+        action = plugin_action.props.get("action", None)
+        if action:
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover', 'service': action}
+            if action == "set_cover_position":
+                msg_data['service_data'] = {"position": plugin_action.props.get("cover_position", 0)}
+            elif action == "set_cover_tilt_position":
+                msg_data['service_data'] = {"position": plugin_action.props.get("tilt_position", 0)}
+            self.send_ws(msg_data)
+
     def set_cover_position_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_cover_position_action for {device.address}")
         if not device.pluginProps.get("SupportsSetPosition", None):
@@ -1071,6 +1099,21 @@ class Plugin(indigo.PluginBase):
     # Fan Action callbacks
     ########################################
 
+    def do_fan_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: do_fan_action: {plugin_action.props}")
+        action = plugin_action.props.get("action", None)
+        if action:
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'fan', 'service': action}
+            if action == "set_percentage":
+                msg_data['service_data'] = {"percentage": plugin_action.props.get("speed", 0)}
+            elif action == "set_direction":
+                msg_data['service_data'] = {"direction": plugin_action.props.get("direction", 0)}
+            elif action == "oscillate":
+                msg_data['service_data'] = {"oscillating": bool(int(plugin_action.props.get("oscillate", 0)))}
+            elif action == "set_preset_mode":
+                msg_data['service_data'] = {"preset_mode": plugin_action.props.get("preset_mode", "")}
+            self.send_ws(msg_data)
+
     def set_fan_speed_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_fan_speed_action for {device.address}")
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'fan',
@@ -1107,6 +1150,20 @@ class Plugin(indigo.PluginBase):
     ########################################
     # Media Player Action callbacks
     ########################################
+
+    def do_media_player_action(self, plugin_action, device, callerWaitingForResult):
+        self.logger.debug(f"{device.name}: do_media_player_action: {plugin_action.props}")
+        action = plugin_action.props.get("action", None)
+        if action:
+            msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player', 'service': action}
+            if action == "play_media":
+                msg_data['service_data'] = {"media_content_id": plugin_action.props.get("media_content_id", ""),
+                                            "media_content_type": plugin_action.props.get("media_content_type", "")}
+            elif action == "select_source":
+                msg_data['service_data'] = {"source": plugin_action.props.get("source", "")}
+            elif action == "select_sound_mode":
+                msg_data['service_data'] = {"sound_mode": plugin_action.props.get("sound_mode", "")}
+            self.send_ws(msg_data)
 
     def media_player_on_action(self, plugin_action, device, callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_on_action for {device.address}")

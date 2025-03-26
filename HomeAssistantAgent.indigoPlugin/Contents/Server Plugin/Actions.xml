@@ -1,10 +1,168 @@
 <?xml version="1.0"?>
 <Actions>
+    <Action id="climate_actions" deviceFilter="self.HAclimate">
+        <Name>Climate Actions</Name>
+        <CallbackMethod>do_climate_action</CallbackMethod>
+        <ConfigUI>
+			<Field id="do_climate_action" type="menu" defaultValue="set_hvac_mode">
+                <Label>Action:</Label>
+        		<List>
+        			<Option value="set_hvac_mode">Climate Set HVAC Mode</Option>
+        			<Option value="turn_on">Climate Turn On</Option>
+        			<Option value="turn_off">Climate Turn Off</Option>
+        			<Option value="set_preset_mode">Climate Set Preset Mode</Option>
+        			<Option value="set_fan_mode">Climate Set Fan Mode</Option>
+        			<Option value="set_humidity">Climate Set Humidity</Option>
+        			<Option value="set_swing_mode">Climate Set Swing Mode</Option>
+        			<Option value="set_horizontal_swing_mode">Climate Set Horizontal Swing Mode</Option>
+        			<Option value="set_temperature">Climate Set Temperature</Option>
+        		</List>
+            </Field>
+            <Field id="hvac_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_hvac_mode">
+                <Label>HVAC System Mode:</Label>
+                 <List class="self" filter="" method="hvac_mode_list" dynamicReload="true"/>
+            </Field>
+            <Field id="preset_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_preset_mode">
+                <Label>Climate Preset Mode:</Label>
+                 <List class="self" filter="" method="hvac_preset_mode_list" dynamicReload="true"/>
+            </Field>
+            <Field id="fan_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_fan_mode">
+                <Label>HVAC Fan Mode:</Label>
+                 <List class="self" filter="" method="hvac_fan_mode_list" dynamicReload="true"/>
+            </Field>
+            <Field id="swing_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_swing_mode">
+                <Label>Swing Mode:</Label>
+                 <List class="self" filter="" method="hvac_swing_mode_list" dynamicReload="true"/>
+            </Field>
+            <Field id="horizontal_swing_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_horizontal_swing_mode">
+                <Label>Swing Mode:</Label>
+                 <List class="self" filter="" method="hvac_swing_mode_list" dynamicReload="true"/>
+            </Field>
+             <Field id="hvac_humidity" type="textfield" default="50"  visibleBindingId="climate_action_id" visibleBindingValue="set_humidity">
+                <Label>Climate Humidity Setpoint:</Label>
+            </Field>
+             <Field id="hvac_temperature" type="textfield" default="72"  visibleBindingId="climate_action_id" visibleBindingValue="set_temperature">
+                <Label>Climate Temperature Setpoint:</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="cover_actions" deviceFilter="self.ha_cover">
+        <Name>Cover Actions</Name>
+        <CallbackMethod>do_cover_action</CallbackMethod>
+        <ConfigUI>
+			<Field id="cover_action_id" type="menu" defaultValue="open_cover">
+                <Label>Action:</Label>
+        		<List>
+        			<Option value="open_cover">Cover Open</Option>
+        			<Option value="close_cover">Cover Close</Option>
+        			<Option value="set_cover_position">Cover Position</Option>
+        			<Option value="stop_cover">Stop Cover Motion</Option>
+        			<Option value="open_cover_tilt">Cover Tilt Open</Option>
+        			<Option value="close_cover_tilt">Cover Tilt Close</Option>
+        			<Option value="set_cover_tilt_position">Cover Set Tilt Position</Option>
+        			<Option value="stop_cover_tilt">Stop Cover Tilt Motion</Option>
+        		</List>
+            </Field>
+            <Field id="cover_position" type="textfield" default="0" visibleBindingId="cover_action_id" visibleBindingValue="set_cover_position">
+                <Label>Cover Position (%):</Label>
+            </Field>
+            <Field id="tilt_position" type="textfield" default="0" visibleBindingId="cover_action_id" visibleBindingValue="set_cover_tilt">
+                <Label>Cover Tilt Position (%):</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="fan_actions" deviceFilter="self.ha_fan">
+        <Name>Fan Actions</Name>
+        <CallbackMethod>do_fan_action</CallbackMethod>
+        <ConfigUI>
+			<Field id="fan_action_id" type="menu" defaultValue="set_fan_speed">
+                <Label>Action:</Label>
+        		<List>
+        			<Option value="set_direction">Fan Set Direction</Option>
+        			<Option value="set_preset_mode">Fan Set Preset Mode</Option>
+        			<Option value="set_speed_percentage">Fan Set Speed Percentage</Option>
+        			<Option value="turn_on">Fan On</Option>
+        			<Option value="turn_off">Fan Off</Option>
+        			<Option value="toggle">Fan Toggle</Option>
+        			<Option value="oscillate">Fan Oscillate</Option>
+        		</List>
+            </Field>
+            <Field id="speed" type="textfield" defaultValue="0" visibleBindingId="fan_action_id" visibleBindingValue="set_fan_speed">
+                <Label>Fan Speed (%):</Label>
+        	</Field>
+            <Field id="direction" type="menu" defaultValue="Off" visibleBindingId="fan_action_id" visibleBindingValue="set_fan_direction">
+        		<Label>Fan Direction:</Label>
+        		<List>
+        			<Option value="forward">Forward</Option>
+        			<Option value="reverse">Reverse</Option>
+        		</List>
+        	</Field>
+            <Field id="preset_mode" type="menu" visibleBindingId="fan_action_id" visibleBindingValue="set_fan_preset_mode">
+                <Label>Fan Preset Mode:</Label>
+                 <List class="self" filter="" method="preset_mode_list" dynamicReload="true"/>
+            </Field>
+            <Field id="oscillate" type="menu" defaultValue="Off"  visibleBindingId="fan_action_id" visibleBindingValue="set_fan_oscillate">
+        		<Label>Fan Oscillate:</Label>
+        		<List>
+        			<Option value="0">Off</Option>
+        			<Option value="1">On</Option>
+        		</List>
+        	</Field>
+        </ConfigUI>
+    </Action>
+    <Action id="media_actions" deviceFilter="self.ha_media_player">
+        <Name>Media Player Actions</Name>
+        <CallbackMethod>do_media_player_action</CallbackMethod>
+        <ConfigUI>
+			<Field id="media_action_id" type="menu" defaultValue="media_player_on">
+                <Label>Action:</Label>
+        		<List>
+        			<Option value="media_player_on">Media Player On</Option>
+        			<Option value="media_player_off">Media Player Off</Option>
+        			<Option value="media_player_set_volume">Media Player Set Volume</Option>
+        			<Option value="media_player_volume_up">Media Player Volume Up</Option>
+        			<Option value="media_player_volume_down">Media Player Volume Dow</Option>
+        			<Option value="media_player_volume_mute">Media Player Volume Mute</Option>
+        			<Option value="media_player_volume_unmute">Media Player Volume Unmute</Option>
+        			<Option value="media_player_media_play">Media Player Media Play</Option>
+        			<Option value="media_player_media_pause">Media Player Media Pause</Option>
+        			<Option value="media_player_media_stop">Media Player Media Stop</Option>
+        			<Option value="media_player_set_shuffle">Set Media Player Shuffle</Option>
+        			<Option value="media_player_set_source">Set Media Player Source</Option>
+        			<Option value="media_player_set_mode">Set Media Player Mode</Option>
+        			<Option value="sonos_play_favorite">Sonos Play Favorite</Option>
+        		</List>
+            </Field>
+            <Field id="volume" type="textfield" default="0" visibleBindingId="media_action_id" visibleBindingValue="media_player_set_volume">
+                <Label>Volume (%):</Label>
+            </Field>
+            <Field id="shuffle" type="checkbox" visibleBindingId="media_action_id" visibleBindingValue="media_player_set_shuffle">
+                <Label>Shuffle Enabled:</Label>
+            </Field>
+            <Field id="media_source" type="menu" visibleBindingId="media_action_id" visibleBindingValue="media_player_set_source">
+                <Label>Media Source:</Label>
+                 <List class="self" filter="" method="media_player_source_list" dynamicReload="true"/>
+            </Field>
+            <Field id="media_mode" type="menu" visibleBindingId="media_action_id" visibleBindingValue="media_player_set_mode">
+                <Label>Media Mode:</Label>
+                 <List class="self" filter="" method="media_player_mode_list" dynamicReload="true"/>
+            </Field>
+            <Field id="favorite" type="menu" visibleBindingId="media_action_id" visibleBindingValue="sonos_play_favorite">
+                <Label>Favorite:</Label>
+                 <List class="self" filter="" method="sonos_favorite_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+
+    <Action id="sep0" />
+
     <Action id="get_states">
         <Name>Request Update for All Entities</Name>
         <CallbackMethod>get_states</CallbackMethod>
     </Action>
-    <Action id="sep0" />
+
+    <Action id="sep1" />
+
     <Action id="run_automation">
         <Name>Run Automation</Name>
         <CallbackMethod>run_automation_command</CallbackMethod>
@@ -16,6 +174,9 @@
             </Field>
         </ConfigUI>
     </Action>
+
+    <Action id="sep2" />
+
     <Action id="set_text">
         <Name>Set Text</Name>
         <CallbackMethod>set_text_command</CallbackMethod>
@@ -30,7 +191,7 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="run_number">
+    <Action id="set_number">
         <Name>Set Number</Name>
         <CallbackMethod>set_number_command</CallbackMethod>
         <ConfigUI>
@@ -44,58 +205,10 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="sep11" />
-    <Action id="set_hvac_mode" deviceFilter="self.HAclimate">
-        <Name>Climate HVAC Mode</Name>
-        <CallbackMethod>set_hvac_mode_action</CallbackMethod>
-        <ConfigUI>
-            <Field id="hvac_mode" type="menu">
-                <Label>HVAC System Mode:</Label>
-                 <List class="self" filter="" method="hvac_mode_list" dynamicReload="true"/>
-            </Field>
-        </ConfigUI>
-    </Action>
-    <Action id="set_hvac_fan_mode" deviceFilter="self.HAclimate">
-        <Name>Climate Fan Mode</Name>
-        <CallbackMethod>set_hvac_fan_mode_action</CallbackMethod>
-        <ConfigUI>
-            <Field id="fan_mode" type="menu">
-                <Label>HVAC Fan Mode:</Label>
-                 <List class="self" filter="" method="hvac_fan_mode_list" dynamicReload="true"/>
-            </Field>
-        </ConfigUI>
-    </Action>
-    <Action id="set_hvac_swing_mode" deviceFilter="self.HAclimate">
-        <Name>Climate Swing Mode</Name>
-        <CallbackMethod>set_hvac_swing_mode_action</CallbackMethod>
-        <ConfigUI>
-            <Field id="hvac_swing_mode" type="menu">
-                <Label>HVAC Swing Mode:</Label>
-                 <List class="self" filter="" method="hvac_swing_mode_list" dynamicReload="true"/>
-            </Field>
-        </ConfigUI>
-    </Action>
-    <Action id="set_hvac_preset_mode" deviceFilter="self.HAclimate">
-        <Name>Climate Preset Mode</Name>
-        <CallbackMethod>set_hvac_preset_mode_action</CallbackMethod>
-        <ConfigUI>
-            <Field id="hvac_preset_mode" type="menu">
-                <Label>Climate Preset Mode:</Label>
-                 <List class="self" filter="" method="hvac_preset_mode_list" dynamicReload="true"/>
-            </Field>
-        </ConfigUI>
-    </Action>
-    <Action id="set_humidity" deviceFilter="self.HAclimate">
-        <Name>Climate Humidity</Name>
-        <CallbackMethod>set_humidity_action</CallbackMethod>
-        <ConfigUI>
-            <Field id="hvac_humidity" type="textfield" default="50">
-                <Label>Climate Humidity Setpoint:</Label>
-            </Field>
-        </ConfigUI>
-    </Action>
-    <Action id="sep1" />
-    <Action id="set_cover_position" deviceFilter="self.ha_cover">
+
+    <!-- Deprecated Cover Actions -->
+
+    <Action id="set_cover_position" deviceFilter="self.ha_cover" uiPath="hidden">
         <Name>Cover Position</Name>
         <CallbackMethod>set_cover_position_action</CallbackMethod>
         <ConfigUI>
@@ -104,19 +217,19 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="stop_cover" deviceFilter="self.ha_cover">
+    <Action id="stop_cover" deviceFilter="self.ha_cover" uiPath="hidden">
         <Name>Cover Stop Movement</Name>
         <CallbackMethod>stop_cover_action</CallbackMethod>
     </Action>
-    <Action id="open_cover_tilt" deviceFilter="self.ha_cover">
+    <Action id="open_cover_tilt" deviceFilter="self.ha_cover" uiPath="hidden">
         <Name>Cover Tilt Open</Name>
         <CallbackMethod>open_cover_tilt_action</CallbackMethod>
     </Action>
-    <Action id="close_cover_tilt" deviceFilter="self.ha_cover">
+    <Action id="close_cover_tilt" deviceFilter="self.ha_cover" uiPath="hidden">
         <Name>Cover Tilt Close</Name>
         <CallbackMethod>close_cover_tilt_action</CallbackMethod>
     </Action>
-    <Action id="set_cover_tilt" deviceFilter="self.ha_cover">
+    <Action id="set_cover_tilt" deviceFilter="self.ha_cover" uiPath="hidden">
         <Name>Cover Set Tilt</Name>
         <CallbackMethod>set_cover_tilt_action</CallbackMethod>
         <ConfigUI>
@@ -125,8 +238,10 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="sep2" />
-    <Action id="set_fan_speed" deviceFilter="self.ha_fan">
+
+    <!-- Deprecated Fan Actions -->
+
+    <Action id="set_fan_speed" deviceFilter="self.ha_fan" uiPath="hidden">
         <Name>Fan Set Speed</Name>
         <CallbackMethod>set_fan_speed_action</CallbackMethod>
         <ConfigUI>
@@ -135,7 +250,7 @@
         	</Field>
         </ConfigUI>
     </Action>
-    <Action id="set_fan_direction" deviceFilter="self.ha_fan">
+    <Action id="set_fan_direction" deviceFilter="self.ha_fan" uiPath="hidden">
         <Name>Fan Direction</Name>
         <CallbackMethod>set_fan_direction_action</CallbackMethod>
         <ConfigUI>
@@ -148,7 +263,7 @@
         	</Field>
         </ConfigUI>
     </Action>
-    <Action id="set_fan_preset_mode" deviceFilter="self.ha_fan">
+    <Action id="set_fan_preset_mode" deviceFilter="self.ha_fan" uiPath="hidden">
         <Name>Fan Preset Mode</Name>
         <CallbackMethod>set_fan_preset_mode_action</CallbackMethod>
         <ConfigUI>
@@ -158,7 +273,7 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="set_fan_oscillate" deviceFilter="self.ha_fan">
+    <Action id="set_fan_oscillate" deviceFilter="self.ha_fan" uiPath="hidden">
         <Name>Fan Oscillate</Name>
         <CallbackMethod>set_fan_oscillate_action</CallbackMethod>
         <ConfigUI>
@@ -171,16 +286,18 @@
         	</Field>
         </ConfigUI>
     </Action>
-    <Action id="sep9" />
-    <Action id="media_player_on" deviceFilter="self.ha_media_player">
+
+    <!-- Deprecated Media Player Actions -->
+
+    <Action id="media_player_on" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player On</Name>
         <CallbackMethod>media_player_on_action</CallbackMethod>
     </Action>
-        <Action id="media_player_off" deviceFilter="self.ha_media_player">
+        <Action id="media_player_off" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Off</Name>
         <CallbackMethod>media_player_off_action</CallbackMethod>
     </Action>
-    <Action id="media_player_set_volume" deviceFilter="self.ha_media_player">
+    <Action id="media_player_set_volume" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Set Volume</Name>
         <CallbackMethod>media_player_set_volume_action</CallbackMethod>
         <ConfigUI>
@@ -189,35 +306,35 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="media_player_volume_up" deviceFilter="self.ha_media_player">
+    <Action id="media_player_volume_up" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Volume Up</Name>
         <CallbackMethod>media_player_volume_up_action</CallbackMethod>
     </Action>
-    <Action id="media_player_volume_down" deviceFilter="self.ha_media_player">
+    <Action id="media_player_volume_down" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Volume Down</Name>
         <CallbackMethod>media_player_volume_down_action</CallbackMethod>
     </Action>
-    <Action id="media_player_volume_mute" deviceFilter="self.ha_media_player">
+    <Action id="media_player_volume_mute" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Volume Mute</Name>
         <CallbackMethod>media_player_volume_mute_action</CallbackMethod>
     </Action>
-    <Action id="media_player_volume_unmute" deviceFilter="self.ha_media_player">
+    <Action id="media_player_volume_unmute" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Volume Unmute</Name>
         <CallbackMethod>media_player_volume_unmute_action</CallbackMethod>
     </Action>
-    <Action id="media_player_media_play" deviceFilter="self.ha_media_player">
+    <Action id="media_player_media_play" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Media Play</Name>
         <CallbackMethod>media_player_media_play_action</CallbackMethod>
     </Action>
-    <Action id="media_player_media_pause" deviceFilter="self.ha_media_player">
+    <Action id="media_player_media_pause" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Media Pause</Name>
         <CallbackMethod>media_player_media_pause_action</CallbackMethod>
     </Action>
-    <Action id="media_player_media_stop" deviceFilter="self.ha_media_player">
+    <Action id="media_player_media_stop" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Media Player Media Stop</Name>
         <CallbackMethod>media_player_media_stop_action</CallbackMethod>
     </Action>
-    <Action id="media_player_set_shuffle" deviceFilter="self.ha_media_player">
+    <Action id="media_player_set_shuffle" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Set Media Player Shuffle</Name>
         <CallbackMethod>media_player_set_shuffle_action</CallbackMethod>
         <ConfigUI>
@@ -226,7 +343,7 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="media_play_set_source" deviceFilter="self.ha_media_player">
+    <Action id="media_play_set_source" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Set Media Player Source</Name>
         <CallbackMethod>media_play_set_source_action</CallbackMethod>
         <ConfigUI>
@@ -236,7 +353,7 @@
             </Field>
         </ConfigUI>
     </Action>
-    <Action id="media_play_set_mode" deviceFilter="self.ha_media_player">
+    <Action id="media_play_set_mode" deviceFilter="self.ha_media_player" uiPath="hidden">
         <Name>Set Media Player Mode</Name>
         <CallbackMethod>media_play_set_mode_action</CallbackMethod>
         <ConfigUI>
@@ -256,4 +373,57 @@
             </Field>
         </ConfigUI>
     </Action>
+
+    <!-- Deprecated Climate Actions -->
+
+    <Action id="set_hvac_mode" deviceFilter="self.HAclimate" uiPath="hidden">
+        <Name>Climate HVAC Mode</Name>
+        <CallbackMethod>set_hvac_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="hvac_mode" type="menu">
+                <Label>HVAC System Mode:</Label>
+                 <List class="self" filter="" method="hvac_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_hvac_fan_mode" deviceFilter="self.HAclimate" uiPath="hidden">
+        <Name>Climate Fan Mode</Name>
+        <CallbackMethod>set_hvac_fan_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="fan_mode" type="menu">
+                <Label>HVAC Fan Mode:</Label>
+                 <List class="self" filter="" method="hvac_fan_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_hvac_swing_mode" deviceFilter="self.HAclimate" uiPath="hidden">
+        <Name>Climate Swing Mode</Name>
+        <CallbackMethod>set_hvac_swing_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="hvac_swing_mode" type="menu">
+                <Label>HVAC Swing Mode:</Label>
+                 <List class="self" filter="" method="hvac_swing_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_hvac_preset_mode" deviceFilter="self.HAclimate" uiPath="hidden">
+        <Name>Climate Preset Mode</Name>
+        <CallbackMethod>set_hvac_preset_mode_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="hvac_preset_mode" type="menu">
+                <Label>Climate Preset Mode:</Label>
+                 <List class="self" filter="" method="hvac_preset_mode_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
+    <Action id="set_humidity" deviceFilter="self.HAclimate" uiPath="hidden">
+        <Name>Climate Humidity</Name>
+        <CallbackMethod>set_humidity_action</CallbackMethod>
+        <ConfigUI>
+            <Field id="hvac_humidity" type="textfield" default="50">
+                <Label>Climate Humidity Setpoint:</Label>
+            </Field>
+        </ConfigUI>
+    </Action>
+
 </Actions>
