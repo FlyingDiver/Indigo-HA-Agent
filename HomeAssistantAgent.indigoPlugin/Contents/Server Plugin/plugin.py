@@ -418,7 +418,9 @@ class Plugin(indigo.PluginBase):
 
         retList = []
         for entity_type, entity_list in self.ha_entity_map.items():
-            if entity_type not in ['binary_sensor', 'climate', 'cover', 'fan', 'light', 'sensor', 'switch', 'lock', 'media_player']:
+            if filter == "generic" and entity_type not in ['binary_sensor', 'climate', 'cover', 'fan', 'light', 'sensor', 'switch', 'lock', 'media_player']:
+                retList.append((entity_type, entity_type))
+            else:
                 retList.append((entity_type, entity_type))
         retList.sort(key=lambda tup: tup[1])
         self.logger.debug(f"get_entity_type_list: {retList = }")
@@ -439,7 +441,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(f"get_entity_list for filter '{filter}': {retList = }")
         return retList
 
-    def menuChanged(self, valuesDict, typeId, devId):
+    def menuChanged(self, valuesDict, typeId=0, devId=0):
         self.logger.debug(f"menuChanged: {typeId = }, {devId = }, {valuesDict = }")
         return valuesDict
 
@@ -894,7 +896,13 @@ class Plugin(indigo.PluginBase):
     # Plugin Menu object callbacks
     ########################################
 
-    def dumpEntities(self):
+    def log_entity(self, valuesDict, typeId=0, devId=0):
+        parts = valuesDict['address'].split('.')
+        entity = self.ha_entity_map[parts[0]][parts[1]]
+        self.logger.info(f"Entity info for '{valuesDict['address']}:\n{json.dumps(entity, sort_keys=True, indent=4, separators=(',', ': '))}")
+        return True
+
+    def log_all_entities(self):
         self.logger.info(f"\n{json.dumps(self.ha_entity_map, sort_keys=True, indent=4, separators=(',', ': '))}")
         return True
 
