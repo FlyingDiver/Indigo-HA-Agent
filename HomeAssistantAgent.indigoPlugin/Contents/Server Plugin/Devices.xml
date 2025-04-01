@@ -292,7 +292,7 @@
 			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
 			<Field id="entity_type" type="menu">
                 <Label>Entity Type:</Label>
-                <List class="self" method="get_entity_type_list" filter="" dynamicReload="true"/>
+                <List class="self" method="get_entity_type_list" filter="generic" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
             </Field>
 			<Field id="address" type="menu">
