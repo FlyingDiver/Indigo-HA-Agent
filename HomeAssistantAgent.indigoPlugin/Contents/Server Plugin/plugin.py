@@ -719,6 +719,7 @@ class Plugin(indigo.PluginBase):
     ########################################
     # Relay/Dimmer Action methods
     ########################################
+
     def actionControlDimmerRelay(self, action, device):
         self.logger.debug(f"{device.name}: sending {action.deviceAction} ({action.actionValue}) to {device.address}")
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}}
@@ -734,8 +735,11 @@ class Plugin(indigo.PluginBase):
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.Toggle:
-                msg_data['service'] = SERVICE_TOGGLE
-                self.send_ws(msg_data)
+                if device.pluginProps.get("SupportsToggle"):
+                    msg_data['service'] = SERVICE_TOGGLE
+                    self.send_ws(msg_data)
+                else:
+                    self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support Toggle")
 
         if device.deviceTypeId == "HAdimmerType":
             msg_data['domain'] = 'light'
@@ -774,27 +778,47 @@ class Plugin(indigo.PluginBase):
 
         if device.deviceTypeId == "ha_media_player":
             msg_data['domain'] = 'media_player'
-            if action.deviceAction == indigo.kDeviceAction.TurnOn and device.pluginProps.get("SupportsPlay"):
-                msg_data['service'] = SERVICE_MEDIA_PLAY
-                self.send_ws(msg_data)
+            if action.deviceAction == indigo.kDeviceAction.TurnOn:
+                if device.pluginProps.get("SupportsOn"):
+                    msg_data['service'] = SERVICE_TURN_ON
+                    self.send_ws(msg_data)
+                elif device.pluginProps.get("SupportsPlay"):
+                    msg_data['service'] = SERVICE_MEDIA_PLAY
+                    self.send_ws(msg_data)
+                else:
+                    self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support TurnOn")
 
-            elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff and device.pluginProps.get("SupportsPause"):
-                msg_data['service'] = SERVICE_MEDIA_PAUSE
-                self.send_ws(msg_data)
+            elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
+                if device.pluginProps.get("SupportsOff"):
+                    msg_data['service'] = SERVICE_TURN_OFF
+                    self.send_ws(msg_data)
+                elif device.pluginProps.get("SupportsPause"):
+                    msg_data['service'] = SERVICE_MEDIA_PAUSE
+                    self.send_ws(msg_data)
+                else:
+                    self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support TurnOff")
 
-            elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness and device.pluginProps.get("SupportsSetVolume"):
-                msg_data['service'] = SERVICE_VOLUME_SET
-                msg_data['service_data'] = {"volume_level": float(action.actionValue) / 100.0}
-                self.send_ws(msg_data)
+            elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness:
+                if device.pluginProps.get("SupportsSetVolume"):
+                    msg_data['service'] = SERVICE_VOLUME_SET
+                    msg_data['service_data'] = {"volume_level": float(action.actionValue) / 100.0}
+                    self.send_ws(msg_data)
+                else:
+                    self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support SetBrightness")
 
-            elif action.deviceAction == indigo.kDimmerRelayAction.BrightenBy and device.pluginProps.get("SupportsVolumeStep"):
-                msg_data['service'] = SERVICE_VOLUME_UP
-                self.send_ws(msg_data)
+            elif action.deviceAction == indigo.kDimmerRelayAction.BrightenBy:
+                if device.pluginProps.get("SupportsVolumeStep"):
+                    msg_data['service'] = SERVICE_VOLUME_UP
+                    self.send_ws(msg_data)
+                else:
+                    self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support BrightenBy")
 
-            elif action.deviceAction == indigo.kDimmerRelayAction.DimBy and device.pluginProps.get("SupportsVolumeStep"):
-                msg_data['service'] = SERVICE_VOLUME_DOWN
-                self.send_ws(msg_data)
-
+            elif action.deviceAction == indigo.kDimmerRelayAction.DimBy:
+                if device.pluginProps.get("SupportsVolumeStep"):
+                    msg_data['service'] = SERVICE_VOLUME_DOWN
+                    self.send_ws(msg_data)
+                else:
+                    self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support DimBy")
             else:
                 self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support {action.deviceAction}")
 
@@ -851,45 +875,67 @@ class Plugin(indigo.PluginBase):
 
     ########################################
     # Speed Control Action callbacks
-    ######################
+    ########################################
     def actionControlSpeedControl(self, action, device):
         self.logger.debug(f"{device.name}: actionControlSpeedControl sending {action.speedControlAction} ({action.actionValue}) to {device.address}")
         msg_data = {"type": "call_service", "domain": 'fan', "target": {"entity_id": device.address}}
         speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
 
         if action.speedControlAction == indigo.kSpeedControlAction.TurnOn:
-            msg_data['service'] = SERVICE_TURN_ON
-            self.send_ws(msg_data)
+            if device.pluginProps.get("SupportsOn"):
+                msg_data['service'] = SERVICE_TURN_ON
+                self.send_ws(msg_data)
+            else:
+                self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support TurnOn")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.TurnOff:
-            msg_data['service'] = SERVICE_TURN_OFF
-            self.send_ws(msg_data)
+            if device.pluginProps.get("SupportsOff"):
+                msg_data['service'] = SERVICE_TURN_OFF
+                self.send_ws(msg_data)
+            else:
+                self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support TurnOff")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.Toggle:
-            msg_data['service'] = SERVICE_TURN_OFF if device.onState else SERVICE_TURN_ON
-            self.send_ws(msg_data)
+            if device.pluginProps.get("SupportsOn") and device.pluginProps.get("SupportsOff"):
+                msg_data['service'] = SERVICE_TURN_OFF if device.onState else SERVICE_TURN_ON
+                self.send_ws(msg_data)
+            else:
+                self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support TurnOn/Off")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedLevel:
-            msg_data['service'] = 'set_percentage'
-            msg_data['service_data'] = {"percentage": action.actionValue}
-            self.send_ws(msg_data)
+            if device.pluginProps.get("SupportsSetSpeedLevel"):
+                msg_data['service'] = 'set_percentage'
+                msg_data['service_data'] = {"percentage": action.actionValue}
+                self.send_ws(msg_data)
+            else:
+                self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support SetSpeedLevel")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedIndex:
-            msg_data['service'] = 'set_percentage'
-            msg_data['service_data'] = {"percentage": str(int(action.actionValue) * speed_index_scale_factor)}
-            self.send_ws(msg_data)
+            if device.pluginProps.get("SupportsSetSpeedLevel"):
+                msg_data['service'] = 'set_percentage'
+                msg_data['service_data'] = {"percentage": str(int(action.actionValue) * speed_index_scale_factor)}
+                self.send_ws(msg_data)
+            else:
+                self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support SetSpeedIndex")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.IncreaseSpeedIndex:
-            speedIndex = min(device.speedIndex + 1, device.speedIndexCount - 1)
-            msg_data['service'] = 'set_percentage'
-            msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
-            self.send_ws(msg_data)
+            if device.pluginProps.get("SupportsSetSpeedLevel"):
+                speedIndex = min(device.speedIndex + 1, device.speedIndexCount - 1)
+                msg_data['service'] = 'set_percentage'
+                msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
+                self.send_ws(msg_data)
+            else:
+                self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support IncreaseSpeedIndex")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.DecreaseSpeedIndex:
-            speedIndex = max(device.speedIndex - 1, 0)
-            msg_data['service'] = 'set_percentage'
-            msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
-            self.send_ws(msg_data)
+            if device.pluginProps.get("SupportsSetSpeedLevel"):
+                speedIndex = max(device.speedIndex - 1, 0)
+                msg_data['service'] = 'set_percentage'
+                msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
+                self.send_ws(msg_data)
+            else:
+                self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support DecreaseSpeedIndex")
+
         self.logger.debug(f"{device.name}: sent {msg_data} to {device.address}")
 
     ########################################
