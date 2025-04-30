@@ -189,6 +189,13 @@
             <Field id="text" type="textfield" default="50">
                 <Label>Text String:</Label>
             </Field>
+             <Field id="set_text_note" type="label">
+                <Label>
+                    Variable and Device State Substitution is enabled for all fields.
+                    Use the format %%v:12345%% for variables and
+                    %%d:12345:someStateId%% for device states.
+                </Label>
+            </Field>
         </ConfigUI>
     </Action>
     <Action id="set_number">
@@ -202,6 +209,13 @@
             </Field>
             <Field id="number" type="textfield" default="50">
                 <Label>Number:</Label>
+            </Field>
+               <Field id="set_number_note" type="label">
+                <Label>
+                    Variable and Device State Substitution is enabled for all fields.
+                    Use the format %%v:12345%% for variables and
+                    %%d:12345:someStateId%% for device states.
+                </Label>
             </Field>
         </ConfigUI>
     </Action>
