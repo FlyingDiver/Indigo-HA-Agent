@@ -224,7 +224,7 @@ class Plugin(indigo.PluginBase):
     def runConcurrentThread(self):
         try:
             while True:
-                self.processMessages()
+                self.message_handler()      # look for queued messages to process
                 self.sleep(0.1)
 
         except self.StopThread:
@@ -1438,28 +1438,41 @@ class Plugin(indigo.PluginBase):
 
     # start up the websocket receiver thread
     def start_websocket(self, delay=0):
-        self.logger.debug(
-            f"start_websocket called with {delay=}, using {self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}")
         ws_url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
+        self.logger.debug(f"start_websocket, {ws_url=}, {delay=}")
+        if self.websocket_thread:
+            self.logger.debug(f"Websocket thread already running, not starting a new one")
+            return
         self.websocket_thread = threading.Timer(delay, self.ws_client, args=(ws_url,)).start()
+        self.logger.debug(f"start_websocket complete")
 
     def ws_client(self, url):
         self.logger.debug(f"Attempting connection to '{url}'")
+        self.ws_connected = False
+        websocket.setdefaulttimeout(10)  # Set a default timeout for websocket operations
 
-        websocket.setdefaulttimeout(5)
-        try:
-            self.ws = websocket.WebSocketApp(url, on_open=self.on_open,
-                                             on_message=self.on_message,
-                                             on_error=self.on_error,
-                                             on_close=self.on_close)
-        except Exception as err:
-            self.logger.error(f"Error connecting to '{url}': {err}")
-            return
+        while True:
+            try:
+                self.ws = websocket.WebSocketApp(url,
+                                                 on_open=self.on_open,
+                                                 on_message=self.on_message,
+                                                 on_error=self.on_error,
+                                                 on_close=self.on_close)
+                self.ws.run_forever(ping_interval=50, reconnect=5)
+            except TimeoutError as err:
+                self.logger.error(f"Timeout Error connecting to '{url}', reconnecting in 10 seconds")
+                time.sleep(10)
 
-        self.ws.run_forever(ping_interval=50, reconnect=5)
+            except Exception as err:
+                self.logger.error(f"Error connecting to '{url}', {err=}, aborting connection")
+                self.ws = None
+                continue
+
+        self.logger.debug(f"start_websocket exiting")
 
     def on_open(self, ws):
         self.logger.debug(f"Websocket connection successful")
+        self.ws_connected = True
 
     def on_message(self, ws, message):
         msg = json.loads(message)
@@ -1470,7 +1483,7 @@ class Plugin(indigo.PluginBase):
         self.ws_connected = False
 
     def on_error(self, ws, error):
-        self.logger.error(f"Websocket error: {error}")
+        self.logger.error(f"Websocket on_error: {error}")
         self.ws_connected = False
         for trigger in indigo.triggers.iter("self"):
             if trigger.pluginTypeId == "connection_event":
@@ -1481,93 +1494,110 @@ class Plugin(indigo.PluginBase):
 
     ################################################################################
 
-    def processMessages(self):
+    def message_handler(self):
 
         while not self.message_queue.empty():
-            self.logger.debug(f"processMessages: {self.message_queue.qsize()} messages in queue")
+            self.logger.debug(f"message_handler: {self.message_queue.qsize()} messages in queue")
             msg = self.message_queue.get()
             if not msg:
                 return
 
-            self.logger.threaddebug(f"Websocket on_message: {json.dumps(msg, indent=4, sort_keys=True)}")
+            if type(msg) is not list:
+                self.process_message(msg)
+            else:
+                self.logger.debug(f"message_handler: {len(msg)} events in msg")
+                for m in msg:
+                    self.process_message(m)
 
-            if msg['type'] == 'auth_required':
-                self.logger.debug(f"Websocket got auth_required for ha_version {msg['ha_version']}, sending auth_token")
-                self.ws.send(json.dumps({'type': 'auth', 'access_token': self.pluginPrefs.get('haToken')}))
+    def process_message(self, msg):
 
-            elif msg['type'] == 'auth_ok':
-                self.logger.debug(f"Websocket got auth_ok for ha_version {msg['ha_version']}")
-                self.ws_connected = True
+        self.logger.threaddebug(f"Websocket on_message: {json.dumps(msg, indent=4, sort_keys=True)}")
 
-                # subscribe to events
-                self.send_ws({"type": 'subscribe_events'})
+        if msg['type'] == 'auth_required':
+            self.logger.debug(f"Websocket got auth_required for ha_version {msg['ha_version']}, sending auth_token")
+            self.ws.send(json.dumps({'type': 'auth', 'access_token': self.pluginPrefs.get('haToken')}))
 
-                # get states to populate devices, and build a list of the current home assistant entities
-                self.send_ws({"type": 'get_states'})
+        elif msg['type'] == 'auth_ok':
+            self.logger.debug(f"Websocket got auth_ok for ha_version {msg['ha_version']}")
+            self.ws_connected = True
 
-            elif msg['type'] == 'auth_invalid':
-                self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
+            # send supported features (coalesce messages)
+            self.send_ws({"type": 'supported_features', "features": {"coalesce_messages": 1}})
 
-            elif msg['type'] == 'result':
-                if msg['id'] in self.sent_messages:
-                    sent = self.sent_messages[msg['id']]
-                    if sent.get('report', False):
-                        self.logger.debug(f"Websocket result for {msg['id']}: {json.dumps(msg, indent=4, sort_keys=True)}")
-                    if not msg['success']:
-                        self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
-                    else:
-                        if self.sent_messages[msg['id']]['type'] == "get_states":
-                            for entity in msg['result']:
-                                self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
-                                self.entity_update(entity['entity_id'], entity, force_update=True)
-                    del self.sent_messages[msg['id']]
+            # subscribe to events
+            self.send_ws({"type": 'subscribe_events',  "event_type": "state_changed"})
+            self.send_ws({"type": 'subscribe_events',  "event_type": "automation_triggered"})
 
+            # get states to populate devices, and build a list of the current home assistant entities
+            self.send_ws({"type": 'get_states'})
+
+        elif msg['type'] == 'auth_invalid':
+            self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
+
+        elif msg['type'] == 'result':
+            self.logger.threaddebug(f"Websocket result message: {json.dumps(msg, indent=4, sort_keys=True)}")
+            if msg['id'] in self.sent_messages:
+                sent = self.sent_messages[msg['id']]
+                if sent.get('report', False):
+                    self.logger.debug(f"Websocket result for {msg['id']}: {json.dumps(msg, indent=4, sort_keys=True)}")
+                if not msg['success']:
+                    self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
                 else:
-                    self.logger.debug(f"Websocket got result for unknown message id: {msg['id']}")
-
-            elif msg.get('type', None) == 'event':
-
-                if msg['event'].get('event_type', None) == 'state_changed':
-                    try:
-                        self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
-                    except Exception as e:
-                        self.logger.error(f"Websocket state_changed exception: {e}")
-                        self.logger.debug(f"Websocket state_changed:\n{msg}")
-
-                elif msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
-                    self.logger.debug(
-                        f"lutron_caseta_button_event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
-
-                elif msg['event'].get('event_type', None) == 'call_service':
-                    data = msg['event']['data']
-                    self.logger.debug(
-                        f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
-
-                elif msg['event'].get('event_type', None) == 'automation_triggered':
-                    event = msg['event']
-                    data = event['data']
-                    self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
-                    self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
-
-                    _update_indigo_var("event_type", event.get('event_type', None), self.var_folder)
-                    _update_indigo_var("event_time", event.get('time_fired', None), self.var_folder)
-                    _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
-                    _update_indigo_var("event_id", data.get('entity_id', None), self.var_folder)
-                    _update_indigo_var("event_name", data.get('name', None), self.var_folder)
-
-                    for trigger in indigo.triggers.iter("self"):
-                        if trigger.pluginTypeId == "automationEvent":
-                            indigo.trigger.execute(trigger)
-
-                else:
-                    self.logger.threaddebug(f"Websocket unimplemented event: {json.dumps(msg['event'])}")
+                    if self.sent_messages[msg['id']]['type'] == "get_states":
+                        for entity in msg['result']:
+                            self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state', None)}")
+                            self.entity_update(entity['entity_id'], entity, force_update=True)
+                del self.sent_messages[msg['id']]
 
             else:
-                self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
+                self.logger.debug(f"Websocket got result for unknown message id: {msg['id']}")
+
+        elif msg.get('type', None) == 'event':
+
+            if msg['event'].get('event_type', None) == 'state_changed':
+                try:
+                    self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
+                except Exception as e:
+                    self.logger.error(f"Websocket state_changed exception: {e}")
+                    self.logger.debug(f"Websocket state_changed:\n{msg}")
+
+            # elif msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
+            #     self.logger.debug(
+            #         f"lutron_caseta_button_event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
+            #
+            # elif msg['event'].get('event_type', None) == 'call_service':
+            #     data = msg['event']['data']
+            #     self.logger.debug(
+            #         f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
+
+            elif msg['event'].get('event_type', None) == 'automation_triggered':
+                event = msg['event']
+                data = event['data']
+                self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
+                self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
+
+                _update_indigo_var("event_type", event.get('event_type', None), self.var_folder)
+                _update_indigo_var("event_time", event.get('time_fired', None), self.var_folder)
+                _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
+                _update_indigo_var("event_id", data.get('entity_id', None), self.var_folder)
+                _update_indigo_var("event_name", data.get('name', None), self.var_folder)
+
+                for trigger in indigo.triggers.iter("self"):
+                    if trigger.pluginTypeId == "automationEvent":
+                        indigo.trigger.execute(trigger)
+
+            else:
+                self.logger.threaddebug(f"Websocket unimplemented event: {json.dumps(msg['event'])}")
+
+        else:
+            self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
 
     def send_ws(self, msg_data, report=False):
         if not self.ws or not self.ws_connected:
             self.logger.error(f"Websocket not connected, cannot send: {msg_data}")
+            for trigger in indigo.triggers.iter("self"):
+                if trigger.pluginTypeId == "connection_event":
+                    indigo.trigger.execute(trigger)
             return
 
         self.last_sent_id += 1
