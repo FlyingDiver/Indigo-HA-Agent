@@ -6,6 +6,7 @@ import logging
 import json
 import threading
 import websocket
+import ssl
 from enum import IntFlag
 from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
 from queue import Queue
@@ -248,7 +249,7 @@ class Plugin(indigo.PluginBase):
 
         haToken = self.pluginPrefs.get('haToken')
         if haToken and len(haToken):
-            self.start_websocket()
+            self.start_websocket_thread()
 
     def on_service_state_change(self, zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
         self.logger.debug(f"Service {name} of type {service_type} state changed: {state_change}")
@@ -287,7 +288,11 @@ class Plugin(indigo.PluginBase):
         features = entity['attributes'].get('supported_features', 0)
 
         # check the attributes for the device and update the Indigo device definition
-        if device.deviceTypeId == "HAclimate":
+
+        if device.deviceTypeId == "HAdimmerType":
+            pass
+
+        elif device.deviceTypeId == "HAclimate":
 
             if features & ClimateEntityFeature.TARGET_TEMPERATURE:
                 new_props["NumTemperatureInputs"] = 1
@@ -324,7 +329,7 @@ class Plugin(indigo.PluginBase):
             if features & FanEntityFeature.PRESET_MODE:
                 new_props["SupportsFanPresetMode"] = True
             if features & FanEntityFeature.SET_SPEED:
-                new_props["SupportsFanSpeed"] = True
+                new_props["SupportsSetSpeed"] = True
 
         elif device.deviceTypeId == "ha_lock":
             if features & LockEntityFeature.OPEN:
@@ -396,7 +401,7 @@ class Plugin(indigo.PluginBase):
             self.logger.debug(f"logLevel = {self.logLevel}")
             haToken = valuesDict.get('haToken')
             if haToken and len(haToken) and not self.ws:
-                self.start_websocket()
+                self.start_websocket_thread()
 
     def found_server_list(self, filter=None, valuesDict=None, typeId=0, targetId=0):
         self.logger.debug(f"found_server_list: filter = {filter}, typeId = {typeId}, targetId = {targetId}, valuesDict = {valuesDict}")
@@ -651,15 +656,46 @@ class Plugin(indigo.PluginBase):
                     device.updateStateOnServer("onOffState", value=True)
 
         elif device.deviceTypeId == "HAdimmerType":
-            if entity["last_updated"] != device.states['lastUpdated']:
-                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
-                device.updateStateOnServer("actual_state", value=entity["state"])
+            if entity["last_updated"] == device.states['lastUpdated']:
+                return  # no update needed
+
+            device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+            device.updateStateOnServer("actual_state", value=entity["state"])
+
+            if attributes.get("color_mode") in [None, '', 'onoff']:
+                if entity["state"] == 'off':
+                    device.updateStateOnServer("onOffState", value=False)
+                else:
+                    device.updateStateOnServer("onOffState", value=True)
+
+            elif attributes.get("color_mode") == 'brightness':
                 if entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
                     brightness = attributes.get("brightness", 0)
-                    device.updateStateOnServer("brightnessLevel", value=round(brightness / 255 * 100))
+                    device.updateStateOnServer("brightnessLevel", value=round(float(brightness) / 255.0 * 100.0))
+
+            elif attributes.get("color_mode") == 'color_temp':
+                pass
+
+            elif attributes.get("color_mode") == 'xy':
+                pass
+
+            elif attributes.get("color_mode") == 'hs':
+                pass
+
+            elif attributes.get("color_mode") == 'rgb':
+                pass
+
+            elif attributes.get("color_mode") == 'rgbw':
+                pass
+
+            elif attributes.get("color_mode") == 'rgbww':
+                pass
+
+            elif attributes.get("color_mode") == 'white':
+                pass
 
         elif device.deviceTypeId == "ha_lock":
             if entity["last_updated"] != device.states['lastUpdated']:
@@ -903,7 +939,7 @@ class Plugin(indigo.PluginBase):
                 self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support TurnOn/Off")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedLevel:
-            if device.pluginProps.get("SupportsSetSpeedLevel"):
+            if device.pluginProps.get("SupportsSetSpeed"):
                 msg_data['service'] = 'set_percentage'
                 msg_data['service_data'] = {"percentage": action.actionValue}
                 self.send_ws(msg_data)
@@ -911,7 +947,7 @@ class Plugin(indigo.PluginBase):
                 self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support SetSpeedLevel")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedIndex:
-            if device.pluginProps.get("SupportsSetSpeedLevel"):
+            if device.pluginProps.get("SupportsSetSpeed"):
                 msg_data['service'] = 'set_percentage'
                 msg_data['service_data'] = {"percentage": str(int(action.actionValue) * speed_index_scale_factor)}
                 self.send_ws(msg_data)
@@ -919,7 +955,7 @@ class Plugin(indigo.PluginBase):
                 self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support SetSpeedIndex")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.IncreaseSpeedIndex:
-            if device.pluginProps.get("SupportsSetSpeedLevel"):
+            if device.pluginProps.get("SupportsSetSpeed"):
                 speedIndex = min(device.speedIndex + 1, device.speedIndexCount - 1)
                 msg_data['service'] = 'set_percentage'
                 msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
@@ -928,7 +964,7 @@ class Plugin(indigo.PluginBase):
                 self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support IncreaseSpeedIndex")
 
         elif action.speedControlAction == indigo.kSpeedControlAction.DecreaseSpeedIndex:
-            if device.pluginProps.get("SupportsSetSpeedLevel"):
+            if device.pluginProps.get("SupportsSetSpeed"):
                 speedIndex = max(device.speedIndex - 1, 0)
                 msg_data['service'] = 'set_percentage'
                 msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
@@ -985,7 +1021,7 @@ class Plugin(indigo.PluginBase):
             entity = self.ha_entity_map[parts[0]][parts[1]]
         except Exception as err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
-            return
+            return []
 
         if entity['attributes'].get('hvac_modes', None):
             return [(preset, preset) for preset in entity['attributes']['hvac_modes']]
@@ -1008,7 +1044,7 @@ class Plugin(indigo.PluginBase):
             entity = self.ha_entity_map[parts[0]][parts[1]]
         except Exception as err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
-            return
+            return []
 
         if entity['attributes'].get('fan_modes', None):
             return [(preset, preset) for preset in entity['attributes']['fan_modes']]
@@ -1023,7 +1059,7 @@ class Plugin(indigo.PluginBase):
             entity = self.ha_entity_map[parts[0]][parts[1]]
         except Exception as err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
-            return
+            return []
 
         if entity['attributes'].get('preset_modes', None):
             return [(preset, preset) for preset in entity['attributes']['preset_modes']]
@@ -1046,7 +1082,7 @@ class Plugin(indigo.PluginBase):
             entity = self.ha_entity_map[parts[0]][parts[1]]
         except Exception as err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
-            return
+            return []
 
         if entity['attributes'].get('swing_modes', None):
             return [(preset, preset) for preset in entity['attributes']['swing_modes']]
@@ -1069,7 +1105,7 @@ class Plugin(indigo.PluginBase):
             entity = self.ha_entity_map[parts[0]][parts[1]]
         except Exception as err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
-            return
+            return []
 
         if entity['attributes'].get('preset_modes', None):
             return [(preset, preset) for preset in entity['attributes']['preset_modes']]
@@ -1308,7 +1344,7 @@ class Plugin(indigo.PluginBase):
             entity = self.ha_entity_map[parts[0]][parts[1]]
         except Exception as err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
-            return
+            return []
 
         if entity['attributes'].get('source_list'):
             return [(preset, preset) for preset in entity['attributes']['source_list']]
@@ -1333,7 +1369,7 @@ class Plugin(indigo.PluginBase):
             entity = self.ha_entity_map[parts[0]][parts[1]]
         except Exception as err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
-            return
+            return []
 
         if entity['attributes'].get('sound_mode_list'):
             return [(preset, preset) for preset in entity['attributes']['sound_mode_list']]
@@ -1437,16 +1473,22 @@ class Plugin(indigo.PluginBase):
     ################################################################################
 
     # start up the websocket receiver thread
-    def start_websocket(self, delay=0):
-        ws_url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
-        self.logger.debug(f"start_websocket, {ws_url=}, {delay=}")
+    def start_websocket_thread(self, delay=0):
         if self.websocket_thread:
             self.logger.debug(f"Websocket thread already running, not starting a new one")
             return
-        self.websocket_thread = threading.Timer(delay, self.ws_client, args=(ws_url,)).start()
-        self.logger.debug(f"start_websocket complete")
 
-    def ws_client(self, url):
+        self.websocket_thread = threading.Timer(delay, self.ws_client).start()
+        self.logger.debug(f"start_websocket_thread complete")
+
+    def ws_client(self):
+
+        use_ssl = self.pluginPrefs.get('use_ssl', False)
+        if use_ssl:
+            url = f"wss://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
+        else:
+            url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
+
         self.logger.debug(f"Attempting connection to '{url}'")
         self.ws_connected = False
         websocket.setdefaulttimeout(10)  # Set a default timeout for websocket operations
@@ -1458,7 +1500,10 @@ class Plugin(indigo.PluginBase):
                                                  on_message=self.on_message,
                                                  on_error=self.on_error,
                                                  on_close=self.on_close)
-                self.ws.run_forever(ping_interval=50, reconnect=5)
+                if use_ssl:
+                    ws.run_forever(ping_interval=50, reconnect=5, sslopt={"ssl_context": ssl.create_default_context(cafile=self.pluginPrefs.get("ssl_certificate", "ca.crt"))})
+                else:
+                    self.ws.run_forever(ping_interval=50, reconnect=5)
             except TimeoutError as err:
                 self.logger.error(f"Timeout Error connecting to '{url}', reconnecting in 10 seconds")
                 time.sleep(10)
@@ -1468,11 +1513,15 @@ class Plugin(indigo.PluginBase):
                 self.ws = None
                 continue
 
-        self.logger.debug(f"start_websocket exiting")
+        self.logger.debug(f"start_websocket_thread exiting")
 
     def on_open(self, ws):
         self.logger.debug(f"Websocket connection successful")
         self.ws_connected = True
+        for trigger in indigo.triggers.iter("self"):
+            if trigger.pluginTypeId == "connection_event":
+                trigger_dict = {"ha-server-connected": True}
+                indigo.trigger.execute(trigger, trigger_data=trigger_dict)
 
     def on_message(self, ws, message):
         msg = json.loads(message)
@@ -1481,23 +1530,31 @@ class Plugin(indigo.PluginBase):
     def on_close(self, ws, close_status_code, close_msg):
         self.logger.warning(f"Websocket closed: {close_status_code} {close_msg}")
         self.ws_connected = False
+        for trigger in indigo.triggers.iter("self"):
+            if trigger.pluginTypeId == "connection_event":
+                trigger_dict = {"ha-server-connected": False, "connection-closed": True, "connection-closed-status-code": close_status_code, "connection-closed-msg": close_msg}
+                indigo.trigger.execute(trigger, trigger_data=trigger_dict)
+
+        # try to restart the websocket
+        self.start_websocket_thread(delay=15)
 
     def on_error(self, ws, error):
         self.logger.error(f"Websocket on_error: {error}")
         self.ws_connected = False
         for trigger in indigo.triggers.iter("self"):
             if trigger.pluginTypeId == "connection_event":
-                indigo.trigger.execute(trigger)
+                trigger_dict = {"ha-server-connected": False, "error": str(error)}
+                indigo.trigger.execute(trigger, trigger_data=trigger_dict)
 
         # try to restart the websocket
-        self.start_websocket(delay=5)
+        self.start_websocket_thread(delay=15)
 
     ################################################################################
 
     def message_handler(self):
 
         while not self.message_queue.empty():
-            self.logger.debug(f"message_handler: {self.message_queue.qsize()} messages in queue")
+            self.logger.threaddebug(f"message_handler: {self.message_queue.qsize()} messages in queue")
             msg = self.message_queue.get()
             if not msg:
                 return
@@ -1505,13 +1562,13 @@ class Plugin(indigo.PluginBase):
             if type(msg) is not list:
                 self.process_message(msg)
             else:
-                self.logger.debug(f"message_handler: {len(msg)} events in msg")
+                self.logger.threaddebug(f"message_handler: {len(msg)} events in msg")
                 for m in msg:
                     self.process_message(m)
 
     def process_message(self, msg):
 
-        self.logger.threaddebug(f"Websocket on_message: {json.dumps(msg, indent=4, sort_keys=True)}")
+        self.logger.threaddebug(f"Websocket process_message: {json.dumps(msg, indent=4, sort_keys=True)}")
 
         if msg['type'] == 'auth_required':
             self.logger.debug(f"Websocket got auth_required for ha_version {msg['ha_version']}, sending auth_token")
@@ -1521,7 +1578,7 @@ class Plugin(indigo.PluginBase):
             self.logger.debug(f"Websocket got auth_ok for ha_version {msg['ha_version']}")
             self.ws_connected = True
 
-            # send supported features (coalesce messages)
+            # send supported features.  Must be first message after auth_ok.
             self.send_ws({"type": 'supported_features', "features": {"coalesce_messages": 1}})
 
             # subscribe to events
@@ -1552,7 +1609,7 @@ class Plugin(indigo.PluginBase):
             else:
                 self.logger.debug(f"Websocket got result for unknown message id: {msg['id']}")
 
-        elif msg.get('type', None) == 'event':
+        elif msg.get('type') == 'event':
 
             if msg['event'].get('event_type', None) == 'state_changed':
                 try:
@@ -1561,33 +1618,37 @@ class Plugin(indigo.PluginBase):
                     self.logger.error(f"Websocket state_changed exception: {e}")
                     self.logger.debug(f"Websocket state_changed:\n{msg}")
 
-            # elif msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
-            #     self.logger.debug(
-            #         f"lutron_caseta_button_event: {msg['event']['data']['serial']}: {msg['event']['data']['button_number']} {msg['event']['data']['action']}")
-            #
-            # elif msg['event'].get('event_type', None) == 'call_service':
-            #     data = msg['event']['data']
-            #     self.logger.debug(
-            #         f"call_service event: {data.get('domain', None)} {data.get('service', None)} {data.get('service_data', None).get('entity_id', None)}")
+            elif msg['event'].get('event_type', None) == 'lutron_caseta_button_event':
+                msg_data = msg['event']['data']
+                self.logger.debug(f"lutron_caseta_button_event: {msg_data['serial']}: {msg_data['button_number']} {msg_data['action']}")
+
+            elif msg['event'].get('event_type', None) == 'call_service':
+                msg_data = msg['event']['data']
+                self.logger.debug(f"call_service event: {msg_data.get('domain')} {msg_data.get('service')} {msg_data.get('service_data').get('entity_id')}")
 
             elif msg['event'].get('event_type', None) == 'automation_triggered':
                 event = msg['event']
                 data = event['data']
-                self.logger.debug(f"automation_triggered event: {data.get('name', None)} ({data.get('entity_id', None)})")
-                self.logger.threaddebug(f"{json.dumps(msg, indent=4, sort_keys=True)}")
+                self.logger.debug(f"automation_triggered event: {data.get('name')} ({data.get('entity_id')})")
 
-                _update_indigo_var("event_type", event.get('event_type', None), self.var_folder)
-                _update_indigo_var("event_time", event.get('time_fired', None), self.var_folder)
-                _update_indigo_var("event_origin", event.get('origin', None), self.var_folder)
-                _update_indigo_var("event_id", data.get('entity_id', None), self.var_folder)
-                _update_indigo_var("event_name", data.get('name', None), self.var_folder)
+                _update_indigo_var("event_type", event.get('event_type'), self.var_folder)
+                _update_indigo_var("event_time", event.get('time_fired'), self.var_folder)
+                _update_indigo_var("event_origin", event.get('origin'), self.var_folder)
+                _update_indigo_var("event_id", data.get('entity_id'), self.var_folder)
+                _update_indigo_var("event_name", data.get('name'), self.var_folder)
 
+                trigger_dict = {
+                    "ha-event_type": event.get('event_type'),
+                    "ha-event_time": event.get('time_fired'),
+                    "ha-event_origin": event.get('origin'),
+                    "ha-event_id": data.get('entity_id'),
+                    "ha-event_name": data.get('name')
+                }
                 for trigger in indigo.triggers.iter("self"):
                     if trigger.pluginTypeId == "automationEvent":
-                        indigo.trigger.execute(trigger)
-
+                        indigo.trigger.execute(trigger, trigger_data=trigger_dict)
             else:
-                self.logger.threaddebug(f"Websocket unimplemented event: {json.dumps(msg['event'])}")
+                self.logger.debug(f"Websocket unimplemented event type: {msg['event'].get('event_type')}")
 
         else:
             self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
@@ -1595,9 +1656,6 @@ class Plugin(indigo.PluginBase):
     def send_ws(self, msg_data, report=False):
         if not self.ws or not self.ws_connected:
             self.logger.error(f"Websocket not connected, cannot send: {msg_data}")
-            for trigger in indigo.triggers.iter("self"):
-                if trigger.pluginTypeId == "connection_event":
-                    indigo.trigger.execute(trigger)
             return
 
         self.last_sent_id += 1
