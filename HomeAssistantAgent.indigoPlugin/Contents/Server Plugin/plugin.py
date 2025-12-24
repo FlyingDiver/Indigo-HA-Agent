@@ -6,6 +6,7 @@ import logging
 import json
 import threading
 import websocket
+import time
 import ssl
 from enum import IntFlag
 from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
@@ -237,7 +238,7 @@ class Plugin(indigo.PluginBase):
         try:
             zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
             services = ["_home-assistant._tcp.local."]
-            browser = ServiceBrowser(zeroconf, services, handlers=[self.on_service_state_change])
+            _browser = ServiceBrowser(zeroconf, services, handlers=[self.on_service_state_change])
         except Exception as e:
             self.logger.error(f"Error starting zeroconf: {e}")
 
@@ -262,7 +263,7 @@ class Plugin(indigo.PluginBase):
                 self.found_ha_servers[name] = {'ip_address': ip_address, 'port': info.port}
 
         elif state_change is ServiceStateChange.Removed:
-            info = zeroconf.get_service_info(service_type, name)
+            _info = zeroconf.get_service_info(service_type, name)
             if name in self.found_ha_servers:
                 del self.found_ha_servers[name]
 
@@ -280,7 +281,7 @@ class Plugin(indigo.PluginBase):
         parts = device.address.split('.')
         try:
             entity = self.ha_entity_map[parts[0]][parts[1]]
-        except Exception as err:
+        except Exception as _err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return
 
@@ -600,7 +601,7 @@ class Plugin(indigo.PluginBase):
                 device.updateStateOnServer("actual_state", value=entity["state"])
 
                 if attributes.get('device_class', None) in ['door', 'garage_door', 'opening', 'window']:
-                    if isOff := entity["state"] == 'off':
+                    if entity["state"] == 'off':
                         device.updateStateOnServer("onOffState", value=False, uiValue="Closed")
                         device.updateStateImageOnServer(indigo.kStateImageSel.Closed)
                     else:
@@ -608,7 +609,7 @@ class Plugin(indigo.PluginBase):
                         device.updateStateImageOnServer(indigo.kStateImageSel.Opened)
 
                 elif attributes.get('device_class', None) == 'lock':
-                    if isOff := entity["state"] == 'off':
+                    if entity["state"] == 'off':
                         device.updateStateOnServer("onOffState", value=False, uiValue="Locked")
                         device.updateStateImageOnServer(indigo.kStateImageSel.Locked)
                     else:
@@ -978,7 +979,7 @@ class Plugin(indigo.PluginBase):
     # Plugin Menu object callbacks
     ########################################
 
-    def log_entity(self, valuesDict, typeId=0, devId=0):
+    def log_entity(self, valuesDict, _typeId=0, _devId=0):
         parts = valuesDict['address'].split('.')
         entity = self.ha_entity_map[parts[0]][parts[1]]
         self.logger.info(f"Entity info for '{valuesDict['address']}:\n{json.dumps(entity, sort_keys=True, indent=4, separators=(',', ': '))}")
@@ -988,7 +989,7 @@ class Plugin(indigo.PluginBase):
         self.logger.info(f"\n{json.dumps(self.ha_entity_map, sort_keys=True, indent=4, separators=(',', ': '))}")
         return True
 
-    def get_states(self, *args):
+    def get_states(self, *_args):
         self.send_ws({"type": 'get_states'})
         return True
 
@@ -996,7 +997,7 @@ class Plugin(indigo.PluginBase):
     # Climate (HVAC) Action callbacks
     ########################################
 
-    def do_climate_action(self, plugin_action, device, callerWaitingForResult):
+    def do_climate_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: do_climate_action: {plugin_action.props}")
         action = plugin_action.props.get("action", None)
         if action:
@@ -1013,13 +1014,13 @@ class Plugin(indigo.PluginBase):
                 msg_data['service_data'] = {"preset_mode": plugin_action.props.get("hvac_preset_mode", "")}
             self.send_ws(msg_data)
 
-    def hvac_mode_list(self, filter, values_dict, type_id, target_id):
+    def hvac_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"hvac_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
         try:
             entity = self.ha_entity_map[parts[0]][parts[1]]
-        except Exception as err:
+        except Exception as _err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return []
 
@@ -1028,7 +1029,7 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def set_hvac_mode_action(self, plugin_action, device, callerWaitingForResult):
+    def set_hvac_mode_action(self, plugin_action, device, _callerWaitingForResult):
         mode = plugin_action.props.get("hvac_mode", None)
         self.logger.debug(f"{device.name}: set_hvac_mode_action: {mode} for {device.address}")
         if mode:
@@ -1036,13 +1037,13 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"hvac_mode": mode}}
             self.send_ws(msg_data)
 
-    def hvac_fan_mode_list(self, filter, values_dict, type_id, target_id):
+    def hvac_fan_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"fan_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
         try:
             entity = self.ha_entity_map[parts[0]][parts[1]]
-        except Exception as err:
+        except Exception as _err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return []
 
@@ -1051,13 +1052,13 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def hvac_fan_preset_list(self, filter, values_dict, type_id, target_id):
+    def hvac_fan_preset_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"hvac_fan_preset_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
         try:
             entity = self.ha_entity_map[parts[0]][parts[1]]
-        except Exception as err:
+        except Exception as _err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return []
 
@@ -1066,7 +1067,7 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def set_hvac_fan_mode_action(self, plugin_action, device, callerWaitingForResult):
+    def set_hvac_fan_mode_action(self, plugin_action, device, _callerWaitingForResult):
         mode = plugin_action.props.get("fan_mode", None)
         self.logger.debug(f"{device.name}: set_fan_mode_action: {mode} for {device.address}")
         if mode:
@@ -1074,13 +1075,13 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"fan_mode": mode}}
             self.send_ws(msg_data)
 
-    def hvac_swing_mode_list(self, filter, values_dict, type_id, target_id):
+    def hvac_swing_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"swing_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
         try:
             entity = self.ha_entity_map[parts[0]][parts[1]]
-        except Exception as err:
+        except Exception as _err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return []
 
@@ -1089,7 +1090,7 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def set_hvac_swing_mode_action(self, plugin_action, device, callerWaitingForResult):
+    def set_hvac_swing_mode_action(self, plugin_action, device, _callerWaitingForResult):
         mode = plugin_action.props.get("hvac_swing_mode", None)
         self.logger.debug(f"{device.name}: set_hvac_swing_mode_action: {mode} for {device.address}")
         if mode:
@@ -1097,13 +1098,13 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"swing_mode": mode}}
             self.send_ws(msg_data)
 
-    def hvac_preset_mode_list(self, filter, values_dict, type_id, target_id):
+    def hvac_preset_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"preset_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
         try:
             entity = self.ha_entity_map[parts[0]][parts[1]]
-        except Exception as err:
+        except Exception as _err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return []
 
@@ -1112,7 +1113,7 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def set_hvac_preset_mode_action(self, plugin_action, device, callerWaitingForResult):
+    def set_hvac_preset_mode_action(self, plugin_action, device, _callerWaitingForResult):
         mode = plugin_action.props.get("hvac_preset_mode", None)
         self.logger.debug(f"{device.name}: set_hvac_preset_mode_action: {mode} for {device.address}")
         if mode:
@@ -1120,7 +1121,7 @@ class Plugin(indigo.PluginBase):
                         'service_data': {"preset_mode": mode}}
             self.send_ws(msg_data)
 
-    def set_humidity_action(self, plugin_action, device, callerWaitingForResult):
+    def set_humidity_action(self, plugin_action, device, _callerWaitingForResult):
         humidity = plugin_action.props.get("hvac_humidity", None)
         self.logger.debug(f"{device.name}: set_humidity_action: {humidity} for {device.address}")
         if humidity:
@@ -1132,7 +1133,7 @@ class Plugin(indigo.PluginBase):
     # Cover  Action callbacks
     ########################################
 
-    def do_cover_action(self, plugin_action, device, callerWaitingForResult):
+    def do_cover_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: do_cover_action: {plugin_action.props}")
         action = plugin_action.props.get("action", None)
         if action:
@@ -1143,7 +1144,7 @@ class Plugin(indigo.PluginBase):
                 msg_data['service_data'] = {"position": plugin_action.props.get("tilt_position", 0)}
             self.send_ws(msg_data)
 
-    def set_cover_position_action(self, plugin_action, device, callerWaitingForResult):
+    def set_cover_position_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_cover_position_action for {device.address}")
         if not device.pluginProps.get("SupportsSetPosition", None):
             self.logger.warning(f"{device.name}: set_cover_position_action: {device.address} does not support set cover position")
@@ -1152,7 +1153,7 @@ class Plugin(indigo.PluginBase):
                     'service': 'set_cover_position', 'service_data': {"position": plugin_action.props.get("cover_position", 0)}}
         self.send_ws(msg_data)
 
-    def stop_cover_action(self, plugin_action, device, callerWaitingForResult):
+    def stop_cover_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: stop_cover_action for {device.address}")
         if not device.pluginProps.get("SupportsStop", None):
             self.logger.warning(f"{device.name}: stop_cover_action: {device.address} does not support stop cover")
@@ -1160,7 +1161,7 @@ class Plugin(indigo.PluginBase):
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover', 'service': 'stop_cover'}
         self.send_ws(msg_data)
 
-    def open_cover_tilt_action(self, plugin_action, device, callerWaitingForResult):
+    def open_cover_tilt_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: open_cover_tilt_action for {device.address}")
         if not device.pluginProps.get("SupportsOpenTilt", None):
             self.logger.warning(f"{device.name}: open_cover_tilt_action: {device.address} does not support open tilt")
@@ -1168,7 +1169,7 @@ class Plugin(indigo.PluginBase):
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover', 'service': 'open_cover_tilt'}
         self.send_ws(msg_data)
 
-    def close_cover_tilt_action(self, plugin_action, device, callerWaitingForResult):
+    def close_cover_tilt_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: close_cover_tilt_action for {device.address}")
         if not device.pluginProps.get("SupportsCloseTilt", None):
             self.logger.warning(f"{device.name}: close_cover_tilt_action: {device.address} does not support close tilt")
@@ -1176,7 +1177,7 @@ class Plugin(indigo.PluginBase):
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'cover', 'service': 'close_cover_tilt'}
         self.send_ws(msg_data)
 
-    def set_cover_tilt_position_action(self, plugin_action, device, callerWaitingForResult):
+    def set_cover_tilt_position_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_cover_tilt_position_action for {device.address}")
         if not device.pluginProps.get("SupportsSetTiltPosition", None):
             self.logger.warning(f"{device.name}: set_cover_tilt_position_action: {device.address} does not support set tilt")
@@ -1189,7 +1190,7 @@ class Plugin(indigo.PluginBase):
     # Fan Action callbacks
     ########################################
 
-    def do_fan_action(self, plugin_action, device, callerWaitingForResult):
+    def do_fan_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: do_fan_action: {plugin_action.props}")
         action = plugin_action.props.get("action", None)
         if action:
@@ -1204,13 +1205,13 @@ class Plugin(indigo.PluginBase):
                 msg_data['service_data'] = {"preset_mode": plugin_action.props.get("preset_mode", "")}
             self.send_ws(msg_data)
 
-    def set_fan_speed_action(self, plugin_action, device, callerWaitingForResult):
+    def set_fan_speed_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_fan_speed_action for {device.address}")
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'fan',
                     'service': 'set_percentage', 'service_data': {"percentage": plugin_action.props.get("speed", 0)}}
         self.send_ws(msg_data)
 
-    def set_fan_direction_action(self, plugin_action, device, callerWaitingForResult):
+    def set_fan_direction_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_fan_direction_action for {device.address}")
         if not device.pluginProps.get("SupportsSetDirection", None):
             self.logger.warning(f"{device.name}: set_fan_direction_action: {device.address} does not support set fan direction")
@@ -1219,7 +1220,7 @@ class Plugin(indigo.PluginBase):
                     'service': 'set_direction', 'service_data': {"direction": plugin_action.props.get("direction", 0)}}
         self.send_ws(msg_data)
 
-    def set_fan_oscillate_action(self, plugin_action, device, callerWaitingForResult):
+    def set_fan_oscillate_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_fan_oscillate_action for {device.address}")
         if not device.pluginProps.get("SupportsOscillate", None):
             self.logger.warning(f"{device.name}: set_fan_oscillate_action: {device.address} does not support oscillate")
@@ -1228,7 +1229,7 @@ class Plugin(indigo.PluginBase):
                     'service': 'oscillate', 'service_data': {"oscillating": bool(int(plugin_action.props.get("oscillate", 0)))}}
         self.send_ws(msg_data)
 
-    def set_fan_preset_mode_action(self, plugin_action, device, callerWaitingForResult):
+    def set_fan_preset_mode_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: set_fan_preset_mode_action for {device.address}")
         if not device.pluginProps.get("SupportsFanPresetMode", None):
             self.logger.warning(f"{device.name}: set_fan_preset_mode_action: {device.address} does not support preset modes")
@@ -1241,7 +1242,7 @@ class Plugin(indigo.PluginBase):
     # Media Player Action callbacks
     ########################################
 
-    def do_media_player_action(self, plugin_action, device, callerWaitingForResult):
+    def do_media_player_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: do_media_player_action: {plugin_action.props}")
         action = plugin_action.props.get("action", None)
         if action:
@@ -1255,7 +1256,7 @@ class Plugin(indigo.PluginBase):
                 msg_data['service_data'] = {"sound_mode": plugin_action.props.get("sound_mode", "")}
             self.send_ws(msg_data)
 
-    def media_player_on_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_on_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_on_action for {device.address}")
         if not device.pluginProps.get("SupportsOn", None):
             self.logger.warning(f"{device.name}: media_player_on_action: {device.address} does not support on action")
@@ -1264,7 +1265,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_TURN_ON}
         self.send_ws(msg_data)
 
-    def media_player_off_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_off_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_off_action for {device.address}")
         if not device.pluginProps.get("SupportsOn", None):
             self.logger.warning(f"{device.name}: media_player_off_action: {device.address} does not support off action")
@@ -1273,7 +1274,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_TURN_OFF}
         self.send_ws(msg_data)
 
-    def media_player_set_volume_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_set_volume_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_set_volume_action for {device.address}")
         if not device.pluginProps.get("SupportsSetVolume", None):
             self.logger.warning(f"{device.name}: media_player_set_volume_action: {device.address} does not support set volume")
@@ -1282,7 +1283,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_VOLUME_SET, 'service_data': {"volume_level": float(plugin_action.props.get("volume", 0)) / 100.0}}
         self.send_ws(msg_data)
 
-    def media_player_volume_up_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_volume_up_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_volume_up_action for {device.address}")
         if not device.pluginProps.get("SupportsVolumeStep", None):
             self.logger.warning(f"{device.name}: media_player_volume_up_action: {device.address} does not support volume step")
@@ -1295,7 +1296,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_VOLUME_SET, 'service_data': {"volume_level": min(current_volume + step, 1)}}  # 1.0 is max volume
         self.send_ws(msg_data)
 
-    def media_player_volume_down_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_volume_down_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_volume_down_action for {device.address}")
         if not device.pluginProps.get("SupportsVolumeStep", None):
             self.logger.warning(f"{device.name}: media_player_volume_down_action: {device.address} does not support volume step")
@@ -1308,7 +1309,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_VOLUME_SET, 'service_data': {"volume_level": max(current_volume - step, 0)}}  # 0.0 is min volume
         self.send_ws(msg_data)
 
-    def media_player_volume_mute_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_volume_mute_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_volume_mute_action for {device.address}")
         if not device.pluginProps.get("SupportsVolumeMute", None):
             self.logger.warning(f"{device.name}: media_player_volume_mute_action: {device.address} does not support volume mute")
@@ -1317,7 +1318,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_VOLUME_MUTE, 'service_data': {"is_volume_muted": True}}
         self.send_ws(msg_data)
 
-    def media_player_volume_unmute_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_volume_unmute_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_volume_unmute_action for {device.address}")
         if not device.pluginProps.get("SupportsVolumeMute", None):
             self.logger.warning(f"{device.name}: media_player_volume_unmute_action: {device.address} does not support volume mute")
@@ -1326,7 +1327,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_VOLUME_MUTE, 'service_data': {"is_volume_muted": False}}
         self.send_ws(msg_data)
 
-    def media_play_set_source_action(self, plugin_action, device, callerWaitingForResult):
+    def media_play_set_source_action(self, plugin_action, device, _callerWaitingForResult):
         source = plugin_action.props.get("media_source")
         self.logger.debug(f"{device.name}: media_play_set_source_action: {source} for {device.address}")
         if not device.pluginProps.get("SupportsSelectSource", None):
@@ -1336,13 +1337,13 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_SELECT_SOURCE, 'service_data': {"source": source}}
         self.send_ws(msg_data)
 
-    def media_player_source_list(self, filter, values_dict, type_id, target_id):
+    def media_player_source_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"media_player_source_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
         try:
             entity = self.ha_entity_map[parts[0]][parts[1]]
-        except Exception as err:
+        except Exception as _err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return []
 
@@ -1351,7 +1352,7 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def media_play_set_mode_action(self, plugin_action, device, callerWaitingForResult):
+    def media_play_set_mode_action(self, plugin_action, device, _callerWaitingForResult):
         mode = plugin_action.props.get("media_mode")
         self.logger.debug(f"{device.name}: media_play_set_mode_action: {mode} for {device.address}")
         if not device.pluginProps.get("SupportsSelectSource", None):
@@ -1361,13 +1362,13 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_SELECT_SOUND_MODE, 'service_data': {"sound_mode": mode}}
         self.send_ws(msg_data)
 
-    def media_player_mode_list(self, filter, values_dict, type_id, target_id):
+    def media_player_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"media_player_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
         parts = device.address.split('.')
         try:
             entity = self.ha_entity_map[parts[0]][parts[1]]
-        except Exception as err:
+        except Exception as _err:
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
             return []
 
@@ -1376,7 +1377,7 @@ class Plugin(indigo.PluginBase):
         else:
             return []
 
-    def media_player_media_play_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_media_play_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_media_play_action for {device.address}")
         if not device.pluginProps.get("SupportsPlay", None):
             self.logger.warning(f"{device.name}: media_player_media_play_action: {device.address} does not support play command")
@@ -1385,7 +1386,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_MEDIA_PLAY}
         self.send_ws(msg_data)
 
-    def media_player_media_pause_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_media_pause_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_media_pause_action for {device.address}")
         if not device.pluginProps.get("SupportsPause", None):
             self.logger.warning(f"{device.name}: media_player_media_pause_action: {device.address} does not support pause command")
@@ -1394,7 +1395,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_MEDIA_PAUSE}
         self.send_ws(msg_data)
 
-    def media_player_media_stop_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_media_stop_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_media_stop_action for {device.address}")
         if not device.pluginProps.get("SupportsStop", None):
             self.logger.warning(f"{device.name}: media_player_media_stop_action: {device.address} does not support stop command")
@@ -1403,7 +1404,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_MEDIA_STOP}
         self.send_ws(msg_data)
 
-    def media_player_set_shuffle_action(self, plugin_action, device, callerWaitingForResult):
+    def media_player_set_shuffle_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_set_shuffle_action for {device.address}")
         set_shuffle = bool(plugin_action.props.get("shuffle", False))
 
@@ -1414,7 +1415,7 @@ class Plugin(indigo.PluginBase):
                     'service': SERVICE_SHUFFLE_SET, 'service_data': {"shuffle": set_shuffle}}
         self.send_ws(msg_data)
 
-    def sonos_play_favorite_action(self, plugin_action, device, callerWaitingForResult):
+    def sonos_play_favorite_action(self, plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: sonos_play_favorite_action for {device.address}, {plugin_action.props['favorite']}")
 
         msg_data = {"type": "call_service",
@@ -1426,11 +1427,11 @@ class Plugin(indigo.PluginBase):
 
         self.send_ws(msg_data)
 
-    def sonos_favorite_list(self, filter, values_dict, type_id, target_id):
+    def sonos_favorite_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"sonos_favorite_list: type_id = {type_id}, target_id = {target_id}")
         try:
             entity = self.ha_entity_map["sensor"]["sonos_favorites"]
-        except Exception as err:
+        except Exception as _err:
             self.logger.warning(f"sensor.sonos_favorites not found")
             return []
 
@@ -1441,32 +1442,32 @@ class Plugin(indigo.PluginBase):
 
     ################################################################################
 
-    def run_automation_command(self, plugin_action, callerWaitingForResult):
+    def run_automation_command(self, plugin_action, _callerWaitingForResult):
         self.logger.debug(f"run_automation_command: {plugin_action.props}")
         if automation_id := plugin_action.props.get("automation_id", None):
             msg_data = {"type": "call_service", 'domain': 'automation', 'service': 'trigger',
                         'service_data': {"entity_id": automation_id}}
             self.send_ws(msg_data)
         else:
-            self.logger.warning(f"{device.name}: run_automation_command: missing automation_id")
+            self.logger.warning(f"run_automation_command: missing automation_id")
 
-    def set_text_command(self, plugin_action, callerWaitingForResult):
+    def set_text_command(self, plugin_action, _callerWaitingForResult):
         self.logger.debug(f"set_text_command: {plugin_action.props}")
         if entity_id := plugin_action.props.get("entity_id"):
             msg_data = {"type": "call_service", 'domain': 'input_text', 'service': 'set_value',
                         'service_data': {"entity_id": entity_id, "value": self.substitute(plugin_action.props.get("text"))}}
             self.send_ws(msg_data)
         else:
-            self.logger.warning(f"{device.name}: set_text_command: missing entity_id")
+            self.logger.warning(f"set_text_command: missing entity_id")
 
-    def set_number_command(self, plugin_action, callerWaitingForResult):
-        self.logger.debug(f"run_automation_command: {plugin_action.props}")
+    def set_number_command(self, plugin_action, _callerWaitingForResult):
+        self.logger.debug(f"set_number_command: {plugin_action.props}")
         if entity_id := plugin_action.props.get("entity_id", None):
             msg_data = {"type": "call_service", 'domain': 'input_number', 'service': 'set_value',
                         'service_data': {"entity_id": entity_id, "value": self.substitute(plugin_action.props.get("number"))}}
             self.send_ws(msg_data)
         else:
-            self.logger.warning(f"{device.name}: set_number_command: missing entity_id")
+            self.logger.warning(f"set_number_command: missing entity_id")
 
     ################################################################################
     # Minimal Websocket Client
@@ -1501,10 +1502,13 @@ class Plugin(indigo.PluginBase):
                                                  on_error=self.on_error,
                                                  on_close=self.on_close)
                 if use_ssl:
-                    ws.run_forever(ping_interval=50, reconnect=5, sslopt={"ssl_context": ssl.create_default_context(cafile=self.pluginPrefs.get("ssl_certificate", "ca.crt"))})
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+                    self.ws.run_forever(ping_interval=50, reconnect=5, sslopt={"ssl_context": ssl_context})
                 else:
                     self.ws.run_forever(ping_interval=50, reconnect=5)
-            except TimeoutError as err:
+            except TimeoutError as _err:
                 self.logger.error(f"Timeout Error connecting to '{url}', reconnecting in 10 seconds")
                 time.sleep(10)
 
@@ -1515,7 +1519,7 @@ class Plugin(indigo.PluginBase):
 
         self.logger.debug(f"start_websocket_thread exiting")
 
-    def on_open(self, ws):
+    def on_open(self, _ws):
         self.logger.debug(f"Websocket connection successful")
         self.ws_connected = True
         for trigger in indigo.triggers.iter("self"):
@@ -1523,11 +1527,11 @@ class Plugin(indigo.PluginBase):
                 trigger_dict = {"ha-server-connected": True}
                 indigo.trigger.execute(trigger, trigger_data=trigger_dict)
 
-    def on_message(self, ws, message):
+    def on_message(self, _ws, message):
         msg = json.loads(message)
         self.message_queue.put(msg)
 
-    def on_close(self, ws, close_status_code, close_msg):
+    def on_close(self, _ws, close_status_code, close_msg):
         self.logger.warning(f"Websocket closed: {close_status_code} {close_msg}")
         self.ws_connected = False
         for trigger in indigo.triggers.iter("self"):
@@ -1538,7 +1542,7 @@ class Plugin(indigo.PluginBase):
         # try to restart the websocket
         self.start_websocket_thread(delay=15)
 
-    def on_error(self, ws, error):
+    def on_error(self, _ws, error):
         self.logger.error(f"Websocket on_error: {error}")
         self.ws_connected = False
         for trigger in indigo.triggers.iter("self"):

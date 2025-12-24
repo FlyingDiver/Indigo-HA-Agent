@@ -16,9 +16,6 @@
     <Field id="use_ssl" type="checkbox" defaultValue="false">
         <Description>Use SSL Connection</Description>
     </Field>>
-    <Field id="ssl_certificate" type="textfield" defaultValue="" visibleBindingId="use_ssl" visibleBindingValue="true" alwaysUseInDialogHeightCalc="true">
-        <Label>Path to certificate file:</Label>
-    </Field>
     <Field type="textfield" id="haToken" defaultvalue="">
         <Label>Home Assistant Long-Lived Access Tokens:</Label>
     </Field>
