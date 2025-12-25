@@ -6,12 +6,10 @@ import logging
 import json
 import threading
 import websocket
-import time
 import ssl
 from enum import IntFlag
 from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
 from queue import Queue
-
 
 def _update_indigo_var(name, value, folder):
     if name not in indigo.variables:
@@ -19,14 +17,12 @@ def _update_indigo_var(name, value, folder):
     else:
         indigo.variable.updateValue(name, value)
 
-
 def is_number(input_str):
     try:
         float(input_str)
         return True
     except ValueError:
         return False
-
 
 HVAC_MODE_ENUM_TO_STR_MAP = {
     indigo.kHvacMode.Cool: "cool",
@@ -59,22 +55,17 @@ FAN_MODE_STR_TO_ENUM_MAP = {
     'on': indigo.kFanMode.AlwaysOn
 }
 
-
 def _lookup_action_str_from_hvac_mode(hvac_mode):
     return HVAC_MODE_ENUM_TO_STR_MAP.get(hvac_mode, "unknown")
-
 
 def _lookup_action_str_from_fan_mode(fan_mode):
     return FAN_MODE_ENUM_TO_STR_MAP.get(fan_mode, "unknown")
 
-
 def _lookup_hvac_mode_from_action_str(hvac_mode):
     return HVAC_MODE_STR_TO_ENUM_MAP.get(hvac_mode.lower(), indigo.kHvacMode.Off)
 
-
 def _lookup_fan_mode_from_action_str(fan_mode):
     return FAN_MODE_STR_TO_ENUM_MAP.get(fan_mode.lower(), indigo.kFanMode.Auto)
-
 
 # Home Assistant Features
 class CoverEntityFeature(IntFlag):
@@ -241,12 +232,6 @@ class Plugin(indigo.PluginBase):
             _browser = ServiceBrowser(zeroconf, services, handlers=[self.on_service_state_change])
         except Exception as e:
             self.logger.error(f"Error starting zeroconf: {e}")
-
-        # get the folder for the event variables
-        if "HAA_Event" in indigo.variables.folders:
-            self.var_folder = indigo.variables.folders["HAA_Event"]
-        else:
-            self.var_folder = indigo.variables.folder.create("HAA_Event")
 
         haToken = self.pluginPrefs.get('haToken')
         if haToken and len(haToken):
@@ -442,7 +427,10 @@ class Plugin(indigo.PluginBase):
             return retList
 
         for entity_name, entity in self.ha_entity_map[filter].items():
-            retList.append((entity['entity_id'], entity_name))
+            if friendly_name := entity.get('attributes').get('friendly_name'):
+                retList.append((entity['entity_id'], f"{friendly_name} ({entity_name})"))
+            else:
+                retList.append((entity['entity_id'], entity_name))
         retList.sort(key=lambda tup: tup[1])
         self.logger.debug(f"get_entity_list for filter '{filter}': {retList = }")
         return retList
@@ -1474,13 +1462,13 @@ class Plugin(indigo.PluginBase):
     ################################################################################
 
     # start up the websocket receiver thread
-    def start_websocket_thread(self, delay=0):
+    def start_websocket_thread(self):
         if self.websocket_thread:
             self.logger.debug(f"Websocket thread already running, not starting a new one")
             return
 
-        self.websocket_thread = threading.Timer(delay, self.ws_client).start()
-        self.logger.debug(f"start_websocket_thread complete")
+        self.websocket_thread = threading.Thread(None, self.ws_client).start()
+        self.logger.debug(f"start_websocket_thread done")
 
     def ws_client(self):
 
@@ -1505,19 +1493,18 @@ class Plugin(indigo.PluginBase):
                     ssl_context = ssl.create_default_context()
                     ssl_context.check_hostname = False
                     ssl_context.verify_mode = ssl.CERT_NONE
-                    self.ws.run_forever(ping_interval=50, reconnect=5, sslopt={"ssl_context": ssl_context})
+                    self.ws.run_forever(ping_interval=50, reconnect=5, sslopt={"cert_reqs": ssl.CERT_NONE, "ssl_context": ssl_context})
                 else:
                     self.ws.run_forever(ping_interval=50, reconnect=5)
             except TimeoutError as _err:
                 self.logger.error(f"Timeout Error connecting to '{url}', reconnecting in 10 seconds")
-                time.sleep(10)
+                self.ws = None
+                self.sleep(10)
 
             except Exception as err:
                 self.logger.error(f"Error connecting to '{url}', {err=}, aborting connection")
                 self.ws = None
-                continue
-
-        self.logger.debug(f"start_websocket_thread exiting")
+                self.sleep(10)
 
     def on_open(self, _ws):
         self.logger.debug(f"Websocket connection successful")
@@ -1539,9 +1526,6 @@ class Plugin(indigo.PluginBase):
                 trigger_dict = {"ha-server-connected": False, "connection-closed": True, "connection-closed-status-code": close_status_code, "connection-closed-msg": close_msg}
                 indigo.trigger.execute(trigger, trigger_data=trigger_dict)
 
-        # try to restart the websocket
-        self.start_websocket_thread(delay=15)
-
     def on_error(self, _ws, error):
         self.logger.error(f"Websocket on_error: {error}")
         self.ws_connected = False
@@ -1549,9 +1533,6 @@ class Plugin(indigo.PluginBase):
             if trigger.pluginTypeId == "connection_event":
                 trigger_dict = {"ha-server-connected": False, "error": str(error)}
                 indigo.trigger.execute(trigger, trigger_data=trigger_dict)
-
-        # try to restart the websocket
-        self.start_websocket_thread(delay=15)
 
     ################################################################################
 
@@ -1566,7 +1547,7 @@ class Plugin(indigo.PluginBase):
             if type(msg) is not list:
                 self.process_message(msg)
             else:
-                self.logger.threaddebug(f"message_handler: {len(msg)} events in msg")
+                self.logger.threaddebug(f"message_handler: {len(msg)} messages in packet")
                 for m in msg:
                     self.process_message(m)
 
@@ -1596,7 +1577,7 @@ class Plugin(indigo.PluginBase):
             self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
 
         elif msg['type'] == 'result':
-            self.logger.threaddebug(f"Websocket result message: {json.dumps(msg, indent=4, sort_keys=True)}")
+            self.logger.debug(f"Websocket result message #{msg['id']}")
             if msg['id'] in self.sent_messages:
                 sent = self.sent_messages[msg['id']]
                 if sent.get('report', False):
@@ -1635,12 +1616,6 @@ class Plugin(indigo.PluginBase):
                 data = event['data']
                 self.logger.debug(f"automation_triggered event: {data.get('name')} ({data.get('entity_id')})")
 
-                _update_indigo_var("event_type", event.get('event_type'), self.var_folder)
-                _update_indigo_var("event_time", event.get('time_fired'), self.var_folder)
-                _update_indigo_var("event_origin", event.get('origin'), self.var_folder)
-                _update_indigo_var("event_id", data.get('entity_id'), self.var_folder)
-                _update_indigo_var("event_name", data.get('name'), self.var_folder)
-
                 trigger_dict = {
                     "ha-event_type": event.get('event_type'),
                     "ha-event_time": event.get('time_fired'),
@@ -1657,15 +1632,14 @@ class Plugin(indigo.PluginBase):
         else:
             self.logger.debug(f"Websocket unknown message type: {json.dumps(msg)}")
 
-    def send_ws(self, msg_data, report=False):
+    def send_ws(self, msg_data):
         if not self.ws or not self.ws_connected:
             self.logger.error(f"Websocket not connected, cannot send: {msg_data}")
             return
 
         self.last_sent_id += 1
         msg_data['id'] = self.last_sent_id
-        if report:
-            self.logger.debug(f"send_ws: {json.dumps(msg_data, indent=4, sort_keys=True)}")
+        self.logger.debug(f"Websocket sending message #{self.last_sent_id}")
+        self.logger.threaddebug(f"{json.dumps(msg_data, indent=4, sort_keys=True)}")
         self.ws.send(json.dumps(msg_data))
-        msg_data['report'] = report
         self.sent_messages[self.last_sent_id] = msg_data
