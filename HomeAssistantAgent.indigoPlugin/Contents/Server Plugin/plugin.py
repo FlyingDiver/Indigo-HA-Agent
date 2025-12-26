@@ -936,6 +936,12 @@ class Plugin(indigo.PluginBase):
 
         elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedLevel:
             if device.pluginProps.get("SupportsSetSpeed"):
+                if action.actionValue > 0:
+                    msg_data['service'] = SERVICE_TURN_ON
+                else:
+                    msg_data['service'] = SERVICE_TURN_OFF
+                self.send_ws(msg_data)
+
                 msg_data['service'] = 'set_percentage'
                 msg_data['service_data'] = {"percentage": action.actionValue}
                 self.send_ws(msg_data)
@@ -944,6 +950,12 @@ class Plugin(indigo.PluginBase):
 
         elif action.speedControlAction == indigo.kSpeedControlAction.SetSpeedIndex:
             if device.pluginProps.get("SupportsSetSpeed"):
+                if action.actionValue > 0:
+                    msg_data['service'] = SERVICE_TURN_ON
+                else:
+                    msg_data['service'] = SERVICE_TURN_OFF
+                self.send_ws(msg_data)
+
                 msg_data['service'] = 'set_percentage'
                 msg_data['service_data'] = {"percentage": str(int(action.actionValue) * speed_index_scale_factor)}
                 self.send_ws(msg_data)
@@ -953,6 +965,12 @@ class Plugin(indigo.PluginBase):
         elif action.speedControlAction == indigo.kSpeedControlAction.IncreaseSpeedIndex:
             if device.pluginProps.get("SupportsSetSpeed"):
                 speedIndex = min(device.speedIndex + 1, device.speedIndexCount - 1)
+                if speedIndex > 0:
+                    msg_data['service'] = SERVICE_TURN_ON
+                else:
+                    msg_data['service'] = SERVICE_TURN_OFF
+                self.send_ws(msg_data)
+
                 msg_data['service'] = 'set_percentage'
                 msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
                 self.send_ws(msg_data)
@@ -962,6 +980,12 @@ class Plugin(indigo.PluginBase):
         elif action.speedControlAction == indigo.kSpeedControlAction.DecreaseSpeedIndex:
             if device.pluginProps.get("SupportsSetSpeed"):
                 speedIndex = max(device.speedIndex - 1, 0)
+                if speedIndex > 0:
+                    msg_data['service'] = SERVICE_TURN_ON
+                else:
+                    msg_data['service'] = SERVICE_TURN_OFF
+                self.send_ws(msg_data)
+
                 msg_data['service'] = 'set_percentage'
                 msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
                 self.send_ws(msg_data)
