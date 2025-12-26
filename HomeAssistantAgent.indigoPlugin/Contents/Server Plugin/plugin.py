@@ -104,7 +104,8 @@ class FanEntityFeature(IntFlag):
     OSCILLATE = 2
     DIRECTION = 4
     PRESET_MODE = 8
-
+    TURN_OFF = 16
+    TURN_ON = 32
 
 class LockEntityFeature(IntFlag):
     """Supported features of the lock entity."""
@@ -714,13 +715,19 @@ class Plugin(indigo.PluginBase):
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
                 device.updateStateOnServer("actual_state", value=entity["state"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
-                if entity["state"] == 'off':
+
+                if percentage := attributes.get("percentage"):
+                    if percentage > 0:
+                        speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
+                        speed_index = round(attributes.get("percentage", 0) / speed_index_scale_factor)
+                        device.updateStateOnServer("onOffState", value=True, uiValue="On")
+                        device.updateStateOnServer("speedIndex", speed_index)
+                    else:
+                        device.updateStateOnServer("onOffState", value=True, uiValue="Off")
+                elif entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False, uiValue="Off")
                 else:
-                    speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
-                    speed_index = round(attributes.get("percentage", 0) / speed_index_scale_factor)
-                    device.updateStateOnServer("onOffState", value=True, uiValue="On")
-                    device.updateStateOnServer("speedIndex", speed_index)
+                    self.logger.warning(f"{device.name} device has no percentage value for state {entity['state']}")
 
         elif device.deviceTypeId == "ha_media_player":
             device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
@@ -1564,7 +1571,7 @@ class Plugin(indigo.PluginBase):
             self.ws_connected = True
 
             # send supported features.  Must be first message after auth_ok.
-            self.send_ws({"type": 'supported_features', "features": {"coalesce_messages": 1}})
+            # self.send_ws({"type": 'supported_features', "features": {"coalesce_messages": 1}})
 
             # subscribe to events
             self.send_ws({"type": 'subscribe_events',  "event_type": "state_changed"})
