@@ -309,14 +309,14 @@ class Plugin(indigo.PluginBase):
 
         elif device.deviceTypeId == "ha_fan":
 
+            if features & FanEntityFeature.SET_SPEED:
+                new_props["SupportsSetSpeed"] = True
             if features & FanEntityFeature.DIRECTION:
                 new_props["SupportsSetDirection"] = True
             if features & FanEntityFeature.OSCILLATE:
                 new_props["SupportsOscillate"] = True
             if features & FanEntityFeature.PRESET_MODE:
                 new_props["SupportsFanPresetMode"] = True
-            if features & FanEntityFeature.SET_SPEED:
-                new_props["SupportsSetSpeed"] = True
 
         elif device.deviceTypeId == "ha_lock":
             if features & LockEntityFeature.OPEN:

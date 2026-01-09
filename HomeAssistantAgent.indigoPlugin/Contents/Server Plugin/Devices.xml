@@ -238,8 +238,8 @@
 		<Name>Home Assistant Fan</Name>
 		<ConfigUI>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false"/>
-			<Field id="SupportsOn" type="checkbox" hidden="true" defaultValue="false"/>
-			<Field id="SupportsOff" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsOn" type="checkbox" hidden="true" defaultValue="true"/>
+			<Field id="SupportsOff" type="checkbox" hidden="true" defaultValue="true"/>
 			<Field id="SupportsSetSpeed" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="SupportsOscillate" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="SupportsDirection" type="checkbox" hidden="true" defaultValue="false"/>
