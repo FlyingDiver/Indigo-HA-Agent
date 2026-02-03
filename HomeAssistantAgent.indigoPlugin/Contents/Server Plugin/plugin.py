@@ -751,11 +751,8 @@ class Plugin(indigo.PluginBase):
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.Toggle:
-                if device.pluginProps.get("SupportsToggle"):
-                    msg_data['service'] = SERVICE_TOGGLE
-                    self.send_ws(msg_data)
-                else:
-                    self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support Toggle")
+                msg_data['service'] = SERVICE_TOGGLE
+                self.send_ws(msg_data)
 
         if device.deviceTypeId == "HAdimmerType":
             msg_data['domain'] = 'light'
@@ -770,6 +767,10 @@ class Plugin(indigo.PluginBase):
             elif action.deviceAction == indigo.kDimmerRelayAction.SetBrightness:
                 msg_data['service'] = SERVICE_TURN_ON
                 msg_data['service_data'] = {"brightness_pct": float(action.actionValue)}
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.Toggle:
+                msg_data['service'] = SERVICE_TOGGLE
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "ha_cover":
