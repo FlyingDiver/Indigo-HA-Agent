@@ -212,6 +212,7 @@ class Plugin(indigo.PluginBase):
         self.last_sent_id = 0
         self.ha_entity_map = {}
         self.message_queue = Queue()
+        self.battery_entities = {}
 
     ########################################
 
@@ -264,11 +265,22 @@ class Plugin(indigo.PluginBase):
 
         self.logger.info(f"{device.name}: Starting Agent device for entity '{device.address}'")
         self.entity_devices[device.address] = device.id
-        parts = device.address.split('.')
+
+        # check for battery support, add relationship to list
+
+        if device.pluginProps.get("SupportsBatteryLevel"):
+            battery_entity = device.pluginProps.get("battery_entity")
+            self.logger.debug(f"{device.name}: {device.address} uses battery entity {battery_entity}")
+            self.battery_entities[device.id] = battery_entity
+            self.logger.debug(f"Battery entity list: {self.battery_entities}")
+
+        # get entity info if it's already saved
+
+        entity_type, entity_name = device.address.split('.')
         try:
-            entity = self.ha_entity_map[parts[0]][parts[1]]
+            entity = self.ha_entity_map[entity_type][entity_name]
         except Exception as _err:
-            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return
 
         new_props = device.pluginProps
@@ -418,8 +430,7 @@ class Plugin(indigo.PluginBase):
         self.logger.debug(f"get_entity_type_list: {retList = }")
         return retList
 
-    def get_entity_list(self, filter="", valuesDict=None, typeId="", targetId=0):
-        self.logger.debug(f"get_entity_list: {filter = }, {typeId = }, {valuesDict = }, {targetId = }")
+    def get_entity_list(self, filter="", valuesDict=None, _typeId="", _targetId=0):
         retList = []
 
         if filter == "generic":
@@ -433,7 +444,7 @@ class Plugin(indigo.PluginBase):
             else:
                 retList.append((entity['entity_id'], entity_name))
         retList.sort(key=lambda tup: tup[1])
-        self.logger.debug(f"get_entity_list for filter '{filter}': {retList = }")
+        self.logger.threaddebug(f"get_entity_list for filter '{filter}': {retList = }")
         return retList
 
     def menuChanged(self, valuesDict, typeId=0, devId=0):
@@ -450,20 +461,18 @@ class Plugin(indigo.PluginBase):
         return stateList
 
     def entity_update(self, entity_id, entity, force_update=False):
-        parts = entity_id.split('.')
+        entity_type, entity_name = entity_id.split('.')
 
         # check for deleted entity
         if entity is None:
             self.logger.debug(f"Removing {entity_id} from ha_entity_map")
-            del self.ha_entity_map[parts[0]][parts[1]]
+            del self.ha_entity_map[entity_type][entity_name]
             return
 
         # save the entity state info in the entity map
-        if parts[0] not in self.ha_entity_map:  # create the entity_type dict if it doesn't exist
-            self.ha_entity_map[parts[0]] = {}
-        self.ha_entity_map[parts[0]][parts[1]] = entity  # save the entity info
-
-        # find the matching Indigo device, update if we have one
+        if entity_type not in self.ha_entity_map:  # create the entity_type dict if it doesn't exist
+            self.ha_entity_map[entity_type] = {}
+        self.ha_entity_map[entity_type][entity_name] = entity  # save the entity info
 
         if not (device_id := self.entity_devices.get(entity_id)):
             return
@@ -495,6 +504,18 @@ class Plugin(indigo.PluginBase):
                 states_list.append({'key': key, 'value': ""})
             else:
                 states_list.append({'key': key, 'value': json.dumps(attributes[key])})
+
+        # Update battery state if needed
+        if device.id in self.battery_entities:
+            battery_entity_id = self.battery_entities.get(device.id)
+            battery_entity_type,  battery_entity_name= battery_entity_id.split('.')
+            try:
+                battery_entity = self.ha_entity_map[battery_entity_type][battery_entity_name]
+            except KeyError:
+                pass
+            else:
+                battery_value = int(battery_entity["state"])
+                states_list.append({'key': 'batteryLevel', 'value':  battery_value, 'uiValue': f'{battery_value}%'})
 
         if set(old_states) != set(new_states):
             self.logger.threaddebug(f"{device.name}: states list changed, updating...")
@@ -984,8 +1005,8 @@ class Plugin(indigo.PluginBase):
     ########################################
 
     def log_entity(self, valuesDict, _typeId=0, _devId=0):
-        parts = valuesDict['address'].split('.')
-        entity = self.ha_entity_map[parts[0]][parts[1]]
+        entity_type, entity_name = valuesDict['address'].split('.')
+        entity = self.ha_entity_map[entity_type][entity_name]
         self.logger.info(f"Entity info for '{valuesDict['address']}:\n{json.dumps(entity, sort_keys=True, indent=4, separators=(',', ': '))}")
         return True
 
@@ -1021,11 +1042,11 @@ class Plugin(indigo.PluginBase):
     def hvac_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"hvac_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
-        parts = device.address.split('.')
+        entity_type, entity_name = device.address.split('.')
         try:
-            entity = self.ha_entity_map[parts[0]][parts[1]]
+            entity = self.ha_entity_map[entity_type][entity_name]
         except Exception as _err:
-            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return []
 
         if entity['attributes'].get('hvac_modes'):
@@ -1044,11 +1065,11 @@ class Plugin(indigo.PluginBase):
     def hvac_fan_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"fan_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
-        parts = device.address.split('.')
+        entity_type, entity_name = device.address.split('.')
         try:
-            entity = self.ha_entity_map[parts[0]][parts[1]]
+            entity = self.ha_entity_map[entity_type][entity_name]
         except Exception as _err:
-            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return []
 
         if entity['attributes'].get('fan_modes'):
@@ -1059,11 +1080,11 @@ class Plugin(indigo.PluginBase):
     def hvac_fan_preset_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"hvac_fan_preset_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
-        parts = device.address.split('.')
+        entity_type, entity_name = device.address.split('.')
         try:
-            entity = self.ha_entity_map[parts[0]][parts[1]]
+            entity = self.ha_entity_map[entity_type][entity_name]
         except Exception as _err:
-            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return []
 
         if entity['attributes'].get('preset_modes'):
@@ -1082,11 +1103,11 @@ class Plugin(indigo.PluginBase):
     def hvac_swing_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"swing_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
-        parts = device.address.split('.')
+        entity_type, entity_name = device.address.split('.')
         try:
-            entity = self.ha_entity_map[parts[0]][parts[1]]
+            entity = self.ha_entity_map[entity_type][entity_name]
         except Exception as _err:
-            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return []
 
         if entity['attributes'].get('swing_modes'):
@@ -1105,11 +1126,11 @@ class Plugin(indigo.PluginBase):
     def hvac_preset_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"preset_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
-        parts = device.address.split('.')
+        entity_type, entity_name = device.address.split('.')
         try:
-            entity = self.ha_entity_map[parts[0]][parts[1]]
+            entity = self.ha_entity_map[entity_type][entity_name]
         except Exception as _err:
-            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return []
 
         if entity['attributes'].get('preset_modes'):
@@ -1344,11 +1365,11 @@ class Plugin(indigo.PluginBase):
     def media_player_source_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"media_player_source_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
-        parts = device.address.split('.')
+        entity_type, entity_name = device.address.split('.')
         try:
-            entity = self.ha_entity_map[parts[0]][parts[1]]
+            entity = self.ha_entity_map[entity_type][entity_name]
         except Exception as _err:
-            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return []
 
         if entity['attributes'].get('source_list'):
@@ -1369,11 +1390,11 @@ class Plugin(indigo.PluginBase):
     def media_player_mode_list(self, _filter, _values_dict, type_id, target_id):
         self.logger.debug(f"media_player_mode_list: type_id = {type_id}, target_id = {target_id}")
         device = indigo.devices[target_id]
-        parts = device.address.split('.')
+        entity_type, entity_name = device.address.split('.')
         try:
-            entity = self.ha_entity_map[parts[0]][parts[1]]
+            entity = self.ha_entity_map[entity_type][entity_name]
         except Exception as _err:
-            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{parts[0]}][{parts[1]}]")
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return []
 
         if entity['attributes'].get('sound_mode_list'):

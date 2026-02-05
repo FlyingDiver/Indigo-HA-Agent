@@ -16,6 +16,13 @@
                 <List class="self" method="get_entity_list" filter="climate" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
             </Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
+            </Field>
 		</ConfigUI>
 		<States>
 			<State id="hvac_modes">
@@ -85,6 +92,13 @@
                 <List class="self" method="get_entity_list" filter="light" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
 			</Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
+            </Field>
 		</ConfigUI>
 		<States>
 			<State id="supported_color_modes">
@@ -114,6 +128,13 @@
                 <List class="self" method="get_entity_list" filter="switch" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
             </Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
+            </Field>
 		</ConfigUI>
 		<States>
 			<State id="lastUpdated">
@@ -140,6 +161,13 @@
                 <List class="self" method="get_entity_list" filter="binary_sensor" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
             </Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
+            </Field>
 		</ConfigUI>
 		<States>
 			<State id="lastUpdated">
@@ -164,6 +192,13 @@
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
             </Field>
 		</ConfigUI>
 		<States>
@@ -195,6 +230,13 @@
                 <List class="self" method="get_entity_list" filter="cover" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
 			</Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
+            </Field>
 		</ConfigUI>
 		<States>
 			<State id="lastUpdated">
@@ -218,6 +260,13 @@
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="lock" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
             </Field>
 		</ConfigUI>
 		<States>
@@ -249,13 +298,20 @@
                 <List class="self" method="get_entity_list" filter="fan" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
 			</Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
+            </Field>
 		</ConfigUI>
 		<States>
 			<State id="lastUpdated">
 				<ValueType>String</ValueType>
 				<TriggerLabel>lastUpdated</TriggerLabel>
 				<ControlPageLabel>lastUpdated</ControlPageLabel>
-			</State>
+			</State>`````````````````````````````````````````````````````````````````````
 			<State id="actual_state">
 				<ValueType>String</ValueType>
 				<TriggerLabel>Actual State</TriggerLabel>
@@ -272,6 +328,13 @@
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="media_player" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
             </Field>
 		</ConfigUI>
 		<States>
@@ -301,6 +364,13 @@
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="generic" dynamicReload="true"/>
                 <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+            <Field id="SupportsBatteryLevel" type="checkbox" defaultValue="false">
+                <Label>Device reports battery status:</Label>
+            </Field>
+            <Field id="battery_entity" type="menu" visibleBindingId="SupportsBatteryLevel" visibleBindingValue="true">
+                <Label>Battery Entity:</Label>
+                <List class="self" method="get_entity_list" filter="sensor" dynamicReload="true"/>
             </Field>
 		</ConfigUI>
 		<States>
