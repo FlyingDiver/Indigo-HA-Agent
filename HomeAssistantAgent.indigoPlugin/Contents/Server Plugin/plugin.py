@@ -1476,6 +1476,15 @@ class Plugin(indigo.PluginBase):
         else:
             self.logger.warning(f"run_automation_command: missing automation_id")
 
+    def send_scene_command(self, plugin_action, _callerWaitingForResult):
+        self.logger.debug(f"send_scene_command: {plugin_action.props}")
+        if entity_id := plugin_action.props.get("entity_id"):
+            msg_data = {"type": "call_service", 'domain': 'scene', 'service': 'turn_on',
+                                                'service_data': {"entity_id": entity_id}}
+            self.send_ws(msg_data)
+        else:
+            self.logger.warning(f"send_scene_command: missing entity_id")
+                        
     def set_text_command(self, plugin_action, _callerWaitingForResult):
         self.logger.debug(f"set_text_command: {plugin_action.props}")
         if entity_id := plugin_action.props.get("entity_id"):

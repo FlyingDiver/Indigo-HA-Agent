@@ -174,7 +174,19 @@
             </Field>
         </ConfigUI>
     </Action>
-
+	
+    <Action id="send_scene_command">
+        <Name>Activate Scene</Name>
+        <CallbackMethod>send_scene_command</CallbackMethod>
+        <ConfigUI>
+            <Field id="entity_id" type="menu">
+                <Label>Scene Entity:</Label>
+                <List class="self" method="get_entity_list" filter="scene" dynamicReload="true"/>
+                <CallbackMethod>menuChanged</CallbackMethod>
+            </Field>
+        </ConfigUI>
+    </Action>
+	
     <Action id="sep2" />
 
     <Action id="set_text">
