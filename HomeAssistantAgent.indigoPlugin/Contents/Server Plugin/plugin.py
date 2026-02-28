@@ -268,11 +268,11 @@ class Plugin(indigo.PluginBase):
 
         # check for battery support, add relationship to list
 
-        if device.pluginProps.get("SupportsBatteryLevel"):
-            battery_entity = device.pluginProps.get("battery_entity")
-            self.logger.debug(f"{device.name}: {device.address} uses battery entity {battery_entity}")
-            self.battery_entities[device.id] = battery_entity
-            self.logger.debug(f"Battery entity list: {self.battery_entities}")
+        if battery := device.pluginProps.get("SupportsBatteryLevel"):
+            if battery:
+                battery_entity = device.pluginProps.get("battery_entity")
+                self.logger.debug(f"{device.name}: {device.address} uses battery entity {battery_entity}")
+                self.battery_entities[device.id] = battery_entity
 
         # get entity info if it's already saved
 
@@ -385,12 +385,8 @@ class Plugin(indigo.PluginBase):
     def deviceStopComm(self, device):
         self.logger.info(f"{device.name}: Stopping Agent device for entity '{device.address}'")
         del self.entity_devices[device.address]
-
-    @staticmethod
-    def didDeviceCommPropertyChange(oldDevice, newDevice):
-        if oldDevice.address != newDevice.address:
-            return True
-        return False
+        if device.id in self.battery_entities:
+            del self.battery_entities[device.id]
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
@@ -403,11 +399,11 @@ class Plugin(indigo.PluginBase):
                 self.start_websocket_thread()
 
     def found_server_list(self, filter=None, valuesDict=None, typeId=0, targetId=0):
-        self.logger.debug(f"found_server_list: filter = {filter}, typeId = {typeId}, targetId = {targetId}, valuesDict = {valuesDict}")
+        self.logger.threaddebug(f"found_server_list: filter = {filter}, typeId = {typeId}, targetId = {targetId}, valuesDict = {valuesDict}")
         retList = []
         for name, data in self.found_ha_servers.items():
             retList.append((name, f"{name} ({data['ip_address']}:{data['port']})"))
-        self.logger.debug(f"found_station_list: retList = {retList}")
+        self.logger.threaddebug(f"found_station_list: retList = {retList}")
         return retList
 
     def menuChangedConfig(self, valuesDict):
@@ -418,7 +414,7 @@ class Plugin(indigo.PluginBase):
         return valuesDict
 
     def get_entity_type_list(self, filter="", valuesDict=None, typeId="", targetId=0):
-        self.logger.debug(f"get_entity_type_list: {filter = }, {typeId = }, {valuesDict = }, {targetId = }")
+        self.logger.threaddebug(f"get_entity_type_list: {filter = }, {typeId = }, {valuesDict = }, {targetId = }")
 
         retList = []
         for entity_type, entity_list in self.ha_entity_map.items():
@@ -427,7 +423,7 @@ class Plugin(indigo.PluginBase):
             else:
                 retList.append((entity_type, entity_type))
         retList.sort(key=lambda tup: tup[1])
-        self.logger.debug(f"get_entity_type_list: {retList = }")
+        self.logger.threaddebug(f"get_entity_type_list: {retList = }")
         return retList
 
     def get_entity_list(self, filter="", valuesDict=None, _typeId="", _targetId=0):
@@ -1646,8 +1642,7 @@ class Plugin(indigo.PluginBase):
                     self.logger.debug(f"state_changed event for {msg['event']['data']['entity_id']}")
                     self.entity_update(msg['event']['data']['entity_id'], msg['event']['data']['new_state'])
                 except Exception as e:
-                    self.logger.error(f"Event state_changed exception: {e}")
-                    self.logger.debug(f"Event state_changed:\n{msg}")
+                    self.logger.error(f"Event state_changed exception: {e}\n{msg}")
 
             elif msg['event'].get('event_type') == 'lutron_caseta_button_event':
                 msg_data = msg['event']['data']
