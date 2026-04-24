@@ -504,14 +504,14 @@ class Plugin(indigo.PluginBase):
         # Update battery state if needed
         if device.id in self.battery_entities:
             battery_entity_id = self.battery_entities.get(device.id)
-            battery_entity_type,  battery_entity_name= battery_entity_id.split('.')
+            battery_entity_type, battery_entity_name = battery_entity_id.split('.')
             try:
                 battery_entity = self.ha_entity_map[battery_entity_type][battery_entity_name]
             except KeyError:
                 pass
             else:
-                battery_value = int(battery_entity["state"])
-                states_list.append({'key': 'batteryLevel', 'value':  battery_value, 'uiValue': f'{battery_value}%'})
+                if battery_value := battery_entity.get("state"):
+                    states_list.append({'key': 'batteryLevel', 'value':  int(battery_value), 'uiValue': f'{battery_value}%'})
 
         if set(old_states) != set(new_states):
             self.logger.threaddebug(f"{device.name}: states list changed, updating...")
