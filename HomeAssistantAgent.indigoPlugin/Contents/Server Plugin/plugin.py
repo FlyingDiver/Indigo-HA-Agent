@@ -213,6 +213,7 @@ class Plugin(indigo.PluginBase):
         self.ha_entity_map = {}
         self.message_queue = Queue()
         self.battery_entities = {}
+        self.custom_states: dict[int, list] = {}
 
     ########################################
 
@@ -448,13 +449,15 @@ class Plugin(indigo.PluginBase):
         return valuesDict
 
     def getDeviceStateList(self, device):
-        stateList = indigo.PluginBase.getDeviceStateList(self, device)
-        add_states = device.pluginProps.get("states_list", indigo.List())
-        for key in add_states:
-            new_state = self.getDeviceStateDictForStringType(str(key), str(key), str(key))
-            stateList.append(new_state)
-        self.logger.threaddebug(f"{device.name}: getDeviceStateList returning: {stateList}")
-        return stateList
+        state_list = indigo.PluginBase.getDeviceStateList(self, device)
+        
+        if device.id in self.custom_states:
+            for key in self.custom_states[device.id]:
+                state_dict = self.getDeviceStateDictForStringType(str(key), str(key), str(key))
+                state_list.append(state_dict)
+
+        self.logger.threaddebug(f"{device.name}: getDeviceStateList returning: {state_list}")
+        return state_list
 
     def entity_update(self, entity_id, entity, force_update=False):
         entity_type, entity_name = entity_id.split('.')
@@ -486,20 +489,19 @@ class Plugin(indigo.PluginBase):
 
         self.logger.debug(f"Updating device {device.name} with {entity}")
 
-        states_list = []
-        old_states = device.pluginProps.get("states_list", indigo.List())
-        new_states = indigo.List()
+        update_list = list()
+        new_states_list = list()
         for key in attributes:
-            self.logger.threaddebug(f"{device.name}: adding to states_list: {key}, {attributes[key]}, {type(attributes[key])}")
-            new_states.append(key)
+            self.logger.threaddebug(f"{device.name}: adding to states list: {key}, {attributes[key]}, {type(attributes[key])}")
+            new_states_list.append(key)
             if type(attributes[key]) in (int, bool, str):
-                states_list.append({'key': key, 'value': attributes[key]})
+                update_list.append({'key': key, 'value': attributes[key]})
             elif type(attributes[key]) is float:
-                states_list.append({'key': key, 'value': attributes[key], 'decimalPlaces': 2})
+                update_list.append({'key': key, 'value': attributes[key], 'decimalPlaces': 2})
             elif type(attributes[key]) is None:
-                states_list.append({'key': key, 'value': ""})
+                update_list.append({'key': key, 'value': ""})
             else:
-                states_list.append({'key': key, 'value': json.dumps(attributes[key])})
+                update_list.append({'key': key, 'value': json.dumps(attributes[key])})
 
         # Update battery state if needed
         if device.id in self.battery_entities:
@@ -511,16 +513,17 @@ class Plugin(indigo.PluginBase):
                 pass
             else:
                 if battery_value := battery_entity.get("state"):
-                    states_list.append({'key': 'batteryLevel', 'value':  int(battery_value), 'uiValue': f'{battery_value}%'})
+                    update_list.append({'key': 'batteryLevel', 'value':  int(battery_value), 'uiValue': f'{battery_value}%'})
 
-        if set(old_states) != set(new_states):
-            self.logger.threaddebug(f"{device.name}: states list changed, updating...")
-            newProps = device.pluginProps
-            newProps["states_list"] = new_states
-            device.replacePluginPropsOnServer(newProps)
+        old_states_list = self.custom_states.get(device.id, list())
+        if set(old_states_list) != set(new_states_list):
+            self.logger.debug(f"{device.name}: states list changed: {old_states_list=}, {new_states_list=}")
+            self.custom_states[device.id] = new_states_list
             device.stateListOrDisplayStateIdChanged()
-            self.sleep(1.0)
-        device.updateStatesOnServer(states_list)
+        else:
+            self.logger.threaddebug(f"{device.name}: states list unchanged")
+
+        device.updateStatesOnServer(update_list)
 
         if device.deviceTypeId == "HAclimate":
 
@@ -1633,7 +1636,7 @@ class Plugin(indigo.PluginBase):
                 if sent.get('report', False):
                     self.logger.debug(f"Websocket result for {msg['id']}: {json.dumps(msg, indent=4, sort_keys=True)}")
                 if not msg['success']:
-                    self.logger.error(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
+                    self.logger.warning(f"Websocket reply error: {msg['error']} for {self.sent_messages[msg['id']]}")
                 else:
                     if self.sent_messages[msg['id']]['type'] == "get_states":
                         for entity in msg['result']:
