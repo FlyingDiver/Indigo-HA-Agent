@@ -1,0 +1,81 @@
+name: Create Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine plugin name
+        id: get_plugin_name
+        run: |
+          PLUGIN_BUNDLE=$(find . -maxdepth 1 -name "*.indigoPlugin" -type d | head -1)
+          if [ -z "$PLUGIN_BUNDLE" ]; then
+            echo "Error: No .indigoPlugin directory found in repository root." >&2
+            exit 1
+          fi
+          PLUGIN_NAME=$(basename "$PLUGIN_BUNDLE" .indigoPlugin)
+          echo "plugin_name=$PLUGIN_NAME" >> $GITHUB_OUTPUT
+          echo "Detected plugin name: $PLUGIN_NAME"
+
+      - name: Extract version from Info.plist
+        id: get_version
+        run: |
+          PLUGIN_NAME="${{ steps.get_plugin_name.outputs.plugin_name }}"
+          VERSION=$(grep -A1 '<key>PluginVersion</key>' "${PLUGIN_NAME}.indigoPlugin/Contents/Info.plist" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not extract PluginVersion from Info.plist." >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Check if release already exists
+        id: check_release
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release v$VERSION already exists, skipping."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Release v$VERSION does not exist, will create."
+          fi
+
+      - name: Create plugin bundle zip
+        if: steps.check_release.outputs.exists == 'false'
+        run: |
+          PLUGIN_NAME="${{ steps.get_plugin_name.outputs.plugin_name }}"
+          zip -r "${PLUGIN_NAME}.indigoPlugin.zip" "${PLUGIN_NAME}.indigoPlugin" \
+            -x "*.pyc" \
+            -x "*/__pycache__" \
+            -x "*/__pycache__/*" \
+            -x "*.sublime-project" \
+            -x "*.sublime-workspace" \
+            -x "*/.idea" \
+            -x "*/.idea/*" \
+            -x "*.bbproject" \
+            -x "*.bbproject/*"
+          echo "Created ${PLUGIN_NAME}.indigoPlugin.zip"
+
+      - name: Create GitHub Release
+        if: steps.check_release.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: Release v${{ steps.get_version.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: ${{ steps.get_plugin_name.outputs.plugin_name }}.indigoPlugin.zip
