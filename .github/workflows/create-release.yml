@@ -57,7 +57,16 @@ jobs:
         if: steps.check_release.outputs.exists == 'false'
         run: |
           PLUGIN_NAME="${{ steps.get_plugin_name.outputs.plugin_name }}"
-          zip -r "${PLUGIN_NAME}.indigoPlugin.zip" "${PLUGIN_NAME}.indigoPlugin"
+          zip -r "${PLUGIN_NAME}.indigoPlugin.zip" "${PLUGIN_NAME}.indigoPlugin" \
+            -x "*.pyc" \
+            -x "*/__pycache__" \
+            -x "*/__pycache__/*" \
+            -x "*.sublime-project" \
+            -x "*.sublime-workspace" \
+            -x "*/.idea" \
+            -x "*/.idea/*" \
+            -x "*.bbproject" \
+            -x "*.bbproject/*"
           echo "Created ${PLUGIN_NAME}.indigoPlugin.zip"
 
       - name: Create GitHub Release
