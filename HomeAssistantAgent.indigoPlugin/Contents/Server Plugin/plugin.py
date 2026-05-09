@@ -1623,6 +1623,9 @@ class Plugin(indigo.PluginBase):
             self.send_ws({"type": 'subscribe_events',  "event_type": "state_changed"})
             self.send_ws({"type": 'subscribe_events',  "event_type": "automation_triggered"})
 
+            # get HA server configuration
+            self.send_ws({"type": 'get_config'})
+
             # get states to populate devices, and build a list of the current home assistant entities
             self.send_ws({"type": 'get_states'})
 
@@ -1642,6 +1645,8 @@ class Plugin(indigo.PluginBase):
                         for entity in msg['result']:
                             self.logger.threaddebug(f"Got states for {entity['entity_id']}, state = {entity.get('state')}")
                             self.entity_update(entity['entity_id'], entity, force_update=True)
+                    elif self.sent_messages[msg['id']]['type'] == "get_config":
+                        self.logger.debug(f"HA Server Config: {json.dumps(msg['result'], indent=4, sort_keys=True)}")
                 del self.sent_messages[msg['id']]
 
             else:
