@@ -7,10 +7,17 @@ on:
 jobs:
     auto-assign:
         runs-on: ubuntu-latest
+        permissions:
+            issues: write
         steps:
             - name: 'Auto-assign issue'
-              uses: pozil/auto-assign-issue@v1.14.0
+              uses: actions/github-script@v8
               with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
-                  assignees: FlyingDiver
+                  script: |
+                      await github.rest.issues.addAssignees({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: context.issue.number,
+                          assignees: ['FlyingDiver']
+                      })
             
