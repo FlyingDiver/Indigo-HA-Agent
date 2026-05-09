@@ -1,0 +1,49 @@
+name: Version Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine plugin name
+        id: get_plugin_name
+        run: |
+          PLUGIN_BUNDLE=$(find . -maxdepth 1 -name "*.indigoPlugin" -type d | head -1)
+          if [ -z "$PLUGIN_BUNDLE" ]; then
+            echo "Error: No .indigoPlugin directory found in repository root." >&2
+            exit 1
+          fi
+          PLUGIN_NAME=$(basename "$PLUGIN_BUNDLE" .indigoPlugin)
+          echo "plugin_name=$PLUGIN_NAME" >> $GITHUB_OUTPUT
+          echo "Detected plugin name: $PLUGIN_NAME"
+
+      - name: Extract version from Info.plist
+        id: get_version
+        run: |
+          VERSION=$(grep -A1 '<key>PluginVersion</key>' $PLUGIN_NAME.indigoPlugin/Contents/Info.plist | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Check if tag already exists
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Version v$VERSION already exists as a git tag. Please update the PluginVersion in Info.plist."
+            exit 1
+          fi
+          # Also check without 'v' prefix
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "::error::Version $VERSION already exists as a git tag. Please update the PluginVersion in Info.plist."
+            exit 1
+          fi
+          echo "✓ Version $VERSION is new and can be released."
