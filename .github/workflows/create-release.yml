@@ -78,5 +78,5 @@ jobs:
           name: Release v${{ steps.get_version.outputs.version }}
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: true
           files: ${{ steps.get_plugin_name.outputs.plugin_name }}.indigoPlugin.zip

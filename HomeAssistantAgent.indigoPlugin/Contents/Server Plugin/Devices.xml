@@ -87,6 +87,9 @@
 		<Name>Home Assistant Light</Name>
 		<ConfigUI>
 			<Field id="SupportsStatusRequest" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsRGB" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsWhiteTemperature" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsWhiteLevel" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="light" dynamicReload="true"/>
@@ -101,11 +104,6 @@
             </Field>
 		</ConfigUI>
 		<States>
-			<State id="supported_color_modes">
-				<ValueType>String</ValueType>
-				<TriggerLabel>supported_color_modes</TriggerLabel>
-				<ControlPageLabel>supported_color_modes</ControlPageLabel>
-			</State>
 			<State id="lastUpdated">
 				<ValueType>String</ValueType>
 				<TriggerLabel>lastUpdated</TriggerLabel>

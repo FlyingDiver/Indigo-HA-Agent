@@ -290,7 +290,13 @@ class Plugin(indigo.PluginBase):
         # check the attributes for the device and update the Indigo device definition
 
         if device.deviceTypeId == "HAdimmerType":
-            pass
+            color_modes = entity['attributes'].get('supported_color_modes', [])
+            if any(m in color_modes for m in ['hs', 'xy', 'rgb', 'rgbw', 'rgbww']):
+                new_props["SupportsRGB"] = True
+            if 'color_temp' in color_modes:
+                new_props["SupportsWhiteTemperature"] = True
+            if any(m in color_modes for m in ['rgbw', 'rgbww', 'white']):
+                new_props["SupportsWhiteLevel"] = True
 
         elif device.deviceTypeId == "HAclimate":
 
@@ -433,6 +439,8 @@ class Plugin(indigo.PluginBase):
         if filter == "generic":
             filter = valuesDict.get('entity_type')
         if not filter:
+            return retList
+        if filter not in self.ha_entity_map:
             return retList
 
         for entity_name, entity in self.ha_entity_map[filter].items():
@@ -688,6 +696,21 @@ class Plugin(indigo.PluginBase):
                     brightness = attributes.get("brightness", 0)
                     device.updateStateOnServer("brightnessLevel", value=round(float(brightness) / 255.0 * 100.0))
 
+                    color_mode = attributes.get("color_mode")
+                    if color_mode in ['rgb', 'hs', 'xy', 'rgbw', 'rgbww'] and attributes.get("rgb_color"):
+                        r, g, b = attributes["rgb_color"]
+                        device.updateStateOnServer("redLevel",   value=round(r / 255.0 * 100.0))
+                        device.updateStateOnServer("greenLevel", value=round(g / 255.0 * 100.0))
+                        device.updateStateOnServer("blueLevel",  value=round(b / 255.0 * 100.0))
+
+                    if color_mode == 'color_temp' and attributes.get("color_temp"):
+                        device.updateStateOnServer("whiteTemperature", value=round(1000000 / attributes["color_temp"]))
+
+                    if color_mode in ['rgbw', 'rgbww'] and attributes.get("rgbw_color"):
+                        device.updateStateOnServer("whiteLevel", value=round(attributes["rgbw_color"][3] / 255.0 * 100.0))
+                    elif color_mode == 'white':
+                        device.updateStateOnServer("whiteLevel", value=round(float(brightness) / 255.0 * 100.0))
+
             else:
                 self.logger.warning(f"{device.name} device has unknown color mode: {attributes.get('color_mode')}")
 
@@ -791,6 +814,23 @@ class Plugin(indigo.PluginBase):
 
             elif action.deviceAction == indigo.kDimmerRelayAction.Toggle:
                 msg_data['service'] = SERVICE_TOGGLE
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.SetColorLevels:
+                msg_data['service'] = SERVICE_TURN_ON
+                color = action.actionValue
+                if 'redLevel' in color:
+                    msg_data['service_data'] = {
+                        "rgb_color": [
+                            round(color['redLevel']   / 100.0 * 255),
+                            round(color['greenLevel']  / 100.0 * 255),
+                            round(color['blueLevel']   / 100.0 * 255),
+                        ]
+                    }
+                elif 'whiteTemperature' in color:
+                    msg_data['service_data'] = {"color_temp_kelvin": int(color['whiteTemperature'])}
+                elif 'whiteLevel' in color:
+                    msg_data['service_data'] = {"brightness_pct": float(color['whiteLevel'])}
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "ha_cover":
