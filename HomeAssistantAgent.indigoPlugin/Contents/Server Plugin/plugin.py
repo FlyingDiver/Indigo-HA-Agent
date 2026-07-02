@@ -506,14 +506,20 @@ class Plugin(indigo.PluginBase):
         # Update battery state if needed
         if device.id in self.battery_entities:
             battery_entity_id = self.battery_entities.get(device.id)
-            battery_entity_type, battery_entity_name = battery_entity_id.split('.')
-            try:
-                battery_entity = self.ha_entity_map[battery_entity_type][battery_entity_name]
-            except KeyError:
-                pass
+            if not battery_entity_id:
+                self.logger.warning(f"{device.name}: battery entity ID is not set")
             else:
-                if battery_value := battery_entity.get("state"):
-                    update_list.append({'key': 'batteryLevel', 'value':  int(battery_value), 'uiValue': f'{battery_value}%'})
+                battery_entity_type, battery_entity_name = battery_entity_id.split('.')
+                try:
+                    battery_entity = self.ha_entity_map[battery_entity_type][battery_entity_name]
+                except KeyError:
+                    self.logger.warning(f"{device.name}: battery entity '{battery_entity_id}' not found in HA entity map")
+                else:
+                    if battery_value := battery_entity.get("state"):
+                        try:
+                            update_list.append({'key': 'batteryLevel', 'value': int(battery_value), 'uiValue': f'{battery_value}%'})
+                        except ValueError:
+                            self.logger.warning(f"{device.name}: battery entity '{battery_entity_id}' has non-numeric state: {battery_value}")
 
         old_states_list = self.custom_states.get(device.id, list())
         if set(old_states_list) != set(new_states_list):
