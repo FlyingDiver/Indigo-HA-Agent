@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import indigo   # noqa
+import colorsys
 import logging
 import json
 import threading
@@ -682,7 +683,7 @@ class Plugin(indigo.PluginBase):
                     device.updateStateOnServer("onOffState", value=True)
 
         elif device.deviceTypeId == "HAdimmerType":
-            if entity["last_updated"] == device.states['lastUpdated']:
+            if entity["last_updated"] == device.states['lastUpdated'] and not force_update:
                 return  # no update needed
 
             device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
@@ -708,6 +709,14 @@ class Plugin(indigo.PluginBase):
                         device.updateStateOnServer("redLevel",   value=round(r / 255.0 * 100.0))
                         device.updateStateOnServer("greenLevel", value=round(g / 255.0 * 100.0))
                         device.updateStateOnServer("blueLevel",  value=round(b / 255.0 * 100.0))
+                    elif color_mode == 'hs' and attributes.get("hs_color"):
+                        h, s = attributes["hs_color"]
+                        r, g, b = colorsys.hsv_to_rgb(h / 360.0, s / 100.0, brightness / 255.0)
+                        device.updateStateOnServer("redLevel",   value=round(r * 100.0))
+                        device.updateStateOnServer("greenLevel", value=round(g * 100.0))
+                        device.updateStateOnServer("blueLevel",  value=round(b * 100.0))
+                    elif color_mode == 'xy':
+                        self.logger.warning(f"{device.name}: xy color mode without rgb_color attribute, cannot convert to RGB")
 
                     if color_mode == 'color_temp' and attributes.get("color_temp"):
                         device.updateStateOnServer("whiteTemperature", value=round(1000000 / attributes["color_temp"]))
@@ -826,13 +835,15 @@ class Plugin(indigo.PluginBase):
                 msg_data['service'] = SERVICE_TURN_ON
                 color = action.actionValue
                 if 'redLevel' in color:
-                    msg_data['service_data'] = {
-                        "rgb_color": [
-                            round(color['redLevel']   / 100.0 * 255),
-                            round(color['greenLevel']  / 100.0 * 255),
-                            round(color['blueLevel']   / 100.0 * 255),
-                        ]
-                    }
+                    rgb = [
+                        round(color['redLevel']   / 100.0 * 255),
+                        round(color['greenLevel']  / 100.0 * 255),
+                        round(color['blueLevel']   / 100.0 * 255),
+                    ]
+                    if 'whiteLevel' in color:
+                        msg_data['service_data'] = {"rgbw_color": rgb + [round(color['whiteLevel'] / 100.0 * 255)]}
+                    else:
+                        msg_data['service_data'] = {"rgb_color": rgb}
                 elif 'whiteTemperature' in color:
                     msg_data['service_data'] = {"color_temp_kelvin": int(color['whiteTemperature'])}
                 elif 'whiteLevel' in color:
