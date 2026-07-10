@@ -206,6 +206,7 @@ class Plugin(indigo.PluginBase):
         self.websocket_thread = None
         self.ws = None
         self.ws_connected = False
+        self._authenticated_this_attempt = False
         self.var_folder = None
         self.found_ha_servers = {}
         self.entity_devices = {}
@@ -555,12 +556,12 @@ class Plugin(indigo.PluginBase):
 
                 # HA setpoints are wonky
 
-                if attributes.get("temperature"):
+                if attributes.get("temperature") is not None:
                     if 'heat' in attributes['hvac_modes']:
                         update_list.append({'key': "setpointHeat", 'value': attributes["temperature"]})
                     if 'cool' in attributes['hvac_modes']:
                         update_list.append({'key': "setpointCool", 'value': attributes["temperature"]})
-                elif attributes.get('target_temp_high') and attributes.get('target_temp_low'):
+                elif attributes.get('target_temp_high') is not None and attributes.get('target_temp_low') is not None:
                     if 'heat' in attributes['hvac_modes']:
                         update_list.append({'key': "setpointHeat", 'value': attributes["target_temp_low"]})
                     if 'cool' in attributes['hvac_modes']:
@@ -610,11 +611,11 @@ class Plugin(indigo.PluginBase):
                 else:
                     update_list.append({'key': "swing_modes", 'value': ""})
 
-                if attributes.get("current_temperature"):
+                if attributes.get("current_temperature") is not None:
                     update_list.append({'key': "temperatureInput1", 'value': attributes["current_temperature"],
                                         'uiValue': f"{attributes['current_temperature']}\u00b0{self.pluginPrefs.get('temp_scale', '')}"})
 
-                if attributes.get("current_humidity"):
+                if attributes.get("current_humidity") is not None:
                     update_list.append({'key': "humidityInput1", 'value': attributes["current_humidity"],
                                         'uiValue': f"{attributes['current_humidity']}%"})
 
@@ -761,14 +762,16 @@ class Plugin(indigo.PluginBase):
                 device.updateStateOnServer("actual_state", value=entity["state"])
                 device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
 
-                if percentage := attributes.get("percentage"):
+                percentage = attributes.get("percentage")
+                if percentage is not None:
                     if percentage > 0:
-                        speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
-                        speed_index = round(attributes.get("percentage", 0) / speed_index_scale_factor)
                         device.updateStateOnServer("onOffState", value=True, uiValue="On")
-                        device.updateStateOnServer("speedIndex", speed_index)
+                        if device.speedIndexCount > 1:
+                            speed_index_scale_factor = 100 / (device.speedIndexCount - 1)
+                            speed_index = round(percentage / speed_index_scale_factor)
+                            device.updateStateOnServer("speedIndex", speed_index)
                     else:
-                        device.updateStateOnServer("onOffState", value=True, uiValue="Off")
+                        device.updateStateOnServer("onOffState", value=False, uiValue="Off")
                 elif entity["state"] == 'off':
                     device.updateStateOnServer("onOffState", value=False, uiValue="Off")
                 else:
@@ -973,10 +976,15 @@ class Plugin(indigo.PluginBase):
     ########################################
     # Speed Control Action callbacks
     ########################################
+    @staticmethod
+    def _fan_speed_index_to_percentage(device, speed_index):
+        if device.speedIndexCount <= 1:
+            return 100
+        return round(speed_index * 100 / (device.speedIndexCount - 1))
+
     def actionControlSpeedControl(self, action, device):
         self.logger.debug(f"{device.name}: actionControlSpeedControl sending {action.speedControlAction} ({action.actionValue}) to {device.address}")
         msg_data = {"type": "call_service", "domain": 'fan', "target": {"entity_id": device.address}}
-        speed_index_scale_factor = int(100 / (device.speedIndexCount - 1))
 
         if action.speedControlAction == indigo.kSpeedControlAction.TurnOn:
             if device.pluginProps.get("SupportsOn"):
@@ -1022,7 +1030,7 @@ class Plugin(indigo.PluginBase):
                 self.send_ws(msg_data)
 
                 msg_data['service'] = 'set_percentage'
-                msg_data['service_data'] = {"percentage": str(int(action.actionValue) * speed_index_scale_factor)}
+                msg_data['service_data'] = {"percentage": self._fan_speed_index_to_percentage(device, int(action.actionValue))}
                 self.send_ws(msg_data)
             else:
                 self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support SetSpeedIndex")
@@ -1037,7 +1045,7 @@ class Plugin(indigo.PluginBase):
                 self.send_ws(msg_data)
 
                 msg_data['service'] = 'set_percentage'
-                msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
+                msg_data['service_data'] = {"percentage": self._fan_speed_index_to_percentage(device, speedIndex)}
                 self.send_ws(msg_data)
             else:
                 self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support IncreaseSpeedIndex")
@@ -1052,7 +1060,7 @@ class Plugin(indigo.PluginBase):
                 self.send_ws(msg_data)
 
                 msg_data['service'] = 'set_percentage'
-                msg_data['service_data'] = {"percentage": str(speedIndex * speed_index_scale_factor)}
+                msg_data['service_data'] = {"percentage": self._fan_speed_index_to_percentage(device, speedIndex)}
                 self.send_ws(msg_data)
             else:
                 self.logger.warning(f"{device.name}: actionControlSpeedControl: {device.address} does not support DecreaseSpeedIndex")
@@ -1420,7 +1428,8 @@ class Plugin(indigo.PluginBase):
             self.logger.warning(f"{device.name}: media_player_volume_up_action: {device.address} does not support volume step")
             return
         step = device.states.get("volumeStep", .1)
-        if not (current_volume := device.states.get("volume_level")):
+        current_volume = device.states.get("volume_level")
+        if current_volume is None:
             self.logger.warning(f"{device.name}: media_player_volume_up_action: {device.address} has no volume_level")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1433,7 +1442,8 @@ class Plugin(indigo.PluginBase):
             self.logger.warning(f"{device.name}: media_player_volume_down_action: {device.address} does not support volume step")
             return
         step = device.states.get("volumeStep", .1)
-        if not (current_volume := device.states.get("volume_level")):
+        current_volume = device.states.get("volume_level")
+        if current_volume is None:
             self.logger.warning(f"{device.name}: media_player_volume_down_action: {device.address} has no volume_level")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1641,6 +1651,7 @@ class Plugin(indigo.PluginBase):
                 url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
 
             self.logger.info(f"Attempting connection to Home Assistant @ '{url}'")
+            self._authenticated_this_attempt = False
             try:
                 self.ws = websocket.WebSocketApp(url,
                                                  on_open=self.on_open,
@@ -1656,9 +1667,13 @@ class Plugin(indigo.PluginBase):
                     self.ws.run_forever(ping_interval=50, reconnect=5)
             except TimeoutError as _err:
                 self.logger.warning(f"Timeout Error connecting to '{url}'")
-                reconnect_delay = min(reconnect_delay * 2, MAX_TIMEOUT)
             except Exception as err:
                 self.logger.warning(f"Error connecting to '{url}', {err=}")
+
+            if self._authenticated_this_attempt:
+                reconnect_delay = INITIAL_TIMEOUT
+            else:
+                reconnect_delay = min(reconnect_delay * 2, MAX_TIMEOUT)
 
             self.ws_connected = False
             self.ws = None
@@ -1723,6 +1738,7 @@ class Plugin(indigo.PluginBase):
         elif msg_type == 'auth_ok':
             self.logger.info(f"Authentication to Home Assistant server complete, server is version {msg['ha_version']}")
             self.ws_connected = True
+            self._authenticated_this_attempt = True
             self.sent_messages.clear()
 
             # send supported features.  Must be first message after auth_ok.
@@ -1740,6 +1756,8 @@ class Plugin(indigo.PluginBase):
 
         elif msg_type == 'auth_invalid':
             self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
+            if self.ws:
+                self.ws.close()
 
         elif msg_type == 'result':
             self.logger.debug(f"Websocket result message #{msg['id']}")
