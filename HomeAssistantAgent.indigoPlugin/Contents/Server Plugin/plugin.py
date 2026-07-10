@@ -1236,7 +1236,7 @@ class Plugin(indigo.PluginBase):
     def set_humidity_action(self, plugin_action, device, _callerWaitingForResult):
         humidity = plugin_action.props.get("hvac_humidity")
         self.logger.debug(f"{device.name}: set_humidity_action: {humidity} for {device.address}")
-        if humidity:
+        if humidity is not None:
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_humidity',
                         'service_data': {"humidity": humidity}}
             self.send_ws(msg_data)
