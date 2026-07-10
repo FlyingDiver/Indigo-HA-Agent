@@ -269,11 +269,10 @@ class Plugin(indigo.PluginBase):
 
         # check for battery support, add relationship to list
 
-        if battery := device.pluginProps.get("SupportsBatteryLevel"):
-            if battery:
-                battery_entity = device.pluginProps.get("battery_entity")
-                self.logger.debug(f"{device.name}: {device.address} uses battery entity {battery_entity}")
-                self.battery_entities[device.id] = battery_entity
+        if device.pluginProps.get("SupportsBatteryLevel"):
+            battery_entity = device.pluginProps.get("battery_entity")
+            self.logger.debug(f"{device.name}: {device.address} uses battery entity {battery_entity}")
+            self.battery_entities[device.id] = battery_entity
 
         # get entity info if it's already saved
 
@@ -385,25 +384,30 @@ class Plugin(indigo.PluginBase):
             if features & MediaPlayerEntityFeature.SELECT_SOURCE:
                 new_props["SupportsSelectSource"] = True
 
-        device.replacePluginPropsOnServer(new_props)
+        if new_props != device.pluginProps:
+            device.replacePluginPropsOnServer(new_props)
         device.stateListOrDisplayStateIdChanged()
         self.entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
 
     def deviceStopComm(self, device):
         self.logger.info(f"{device.name}: Stopping Agent device for entity '{device.address}'")
-        del self.entity_devices[device.address]
-        if device.id in self.battery_entities:
-            del self.battery_entities[device.id]
+        self.entity_devices.pop(device.address, None)
+        self.battery_entities.pop(device.id, None)
 
     def closedPrefsConfigUi(self, valuesDict, userCancelled):
         if not userCancelled:
             self.logger.threaddebug(f"closedPrefsConfigUi: valuesDict = {valuesDict}")
             self.logLevel = int(self.pluginPrefs.get("logLevel", logging.INFO))
             self.indigo_log_handler.setLevel(self.logLevel)
+            self.plugin_file_handler.setLevel(self.logLevel)
             self.logger.debug(f"logLevel = {self.logLevel}")
             haToken = valuesDict.get('haToken')
-            if haToken and len(haToken) and not self.ws:
-                self.start_websocket_thread()
+            if haToken and len(haToken):
+                if not self.ws:
+                    self.start_websocket_thread()
+                else:
+                    self.logger.info("Home Assistant connection settings changed, reconnecting")
+                    self.ws.close()
 
     def found_server_list(self, filter=None, valuesDict=None, typeId=0, targetId=0):
         self.logger.threaddebug(f"found_server_list: filter = {filter}, typeId = {typeId}, targetId = {targetId}, valuesDict = {valuesDict}")
@@ -699,7 +703,7 @@ class Plugin(indigo.PluginBase):
                     device.updateStateOnServer("onOffState", value=False)
                 else:
                     device.updateStateOnServer("onOffState", value=True)
-                    brightness = attributes.get("brightness", 0)
+                    brightness = attributes.get("brightness") or 0
                     device.updateStateOnServer("brightnessLevel", value=round(float(brightness) / 255.0 * 100.0))
 
                     color_mode = attributes.get("color_mode")
@@ -1621,13 +1625,6 @@ class Plugin(indigo.PluginBase):
 
     def ws_client(self):
 
-        use_ssl = self.pluginPrefs.get('use_ssl', False)
-        if use_ssl:
-            url = f"wss://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
-        else:
-            url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
-
-        self.logger.info(f"Attempting connection to Home Assistant @ '{url}'")
         self.ws_connected = False
         websocket.setdefaulttimeout(10)  # noqa  Set a default timeout for websocket operations
 
@@ -1637,6 +1634,13 @@ class Plugin(indigo.PluginBase):
         reconnect_delay = INITIAL_TIMEOUT
 
         while True:
+            use_ssl = self.pluginPrefs.get('use_ssl', False)
+            if use_ssl:
+                url = f"wss://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
+            else:
+                url = f"ws://{self.pluginPrefs.get('address', 'localhost')}:{self.pluginPrefs.get('port', '8123')}/api/websocket"
+
+            self.logger.info(f"Attempting connection to Home Assistant @ '{url}'")
             try:
                 self.ws = websocket.WebSocketApp(url,
                                                  on_open=self.on_open,
@@ -1710,13 +1714,16 @@ class Plugin(indigo.PluginBase):
 
         self.logger.threaddebug(f"Websocket process_message: {json.dumps(msg, indent=4, sort_keys=True)}")
 
-        if msg['type'] == 'auth_required':
+        msg_type = msg.get('type')
+
+        if msg_type == 'auth_required':
             self.logger.debug(f"Websocket got auth_required for ha_version {msg['ha_version']}, sending auth_token")
             self.ws.send(json.dumps({'type': 'auth', 'access_token': self.pluginPrefs.get('haToken')}))
 
-        elif msg['type'] == 'auth_ok':
+        elif msg_type == 'auth_ok':
             self.logger.info(f"Authentication to Home Assistant server complete, server is version {msg['ha_version']}")
             self.ws_connected = True
+            self.sent_messages.clear()
 
             # send supported features.  Must be first message after auth_ok.
             # self.send_ws({"type": 'supported_features', "features": {"coalesce_messages": 1}})
@@ -1731,10 +1738,10 @@ class Plugin(indigo.PluginBase):
             # get states to populate devices, and build a list of the current home assistant entities
             self.send_ws({"type": 'get_states'})
 
-        elif msg['type'] == 'auth_invalid':
+        elif msg_type == 'auth_invalid':
             self.logger.error(f"Websocket got auth_invalid: {msg['message']}")
 
-        elif msg['type'] == 'result':
+        elif msg_type == 'result':
             self.logger.debug(f"Websocket result message #{msg['id']}")
             if msg['id'] in self.sent_messages:
                 sent = self.sent_messages[msg['id']]
@@ -1754,7 +1761,7 @@ class Plugin(indigo.PluginBase):
             else:
                 self.logger.debug(f"Websocket got result for unknown message id: {msg['id']}")
 
-        elif msg.get('type') == 'event':
+        elif msg_type == 'event':
 
             if msg['event'].get('event_type') == 'state_changed':
                 try:

@@ -5,18 +5,18 @@
         <List class="self" method="found_server_list" dynamicReload="true"/>
         <CallbackMethod>menuChangedConfig</CallbackMethod>
     </Field>
-	<Field type="textfield" id="address" defaultvalue="localhost">
+	<Field type="textfield" id="address" defaultValue="localhost">
         <Label>Home Assistant Server Hostname or IP Address:</Label>
         <CallbackMethod>menuChangedConfig</CallbackMethod>
   </Field>
-    <Field type="textfield" id="port" defaultvalue="8123">
+    <Field type="textfield" id="port" defaultValue="8123">
         <Label>Home Assistant Server Port:</Label>
         <CallbackMethod>menuChangedConfig</CallbackMethod>
     </Field>
     <Field id="use_ssl" type="checkbox" defaultValue="false">
         <Description>Use SSL Connection</Description>
-    </Field>>
-    <Field type="textfield" id="haToken" defaultvalue="">
+    </Field>
+    <Field type="textfield" id="haToken" defaultValue="">
         <Label>Home Assistant Long-Lived Access Tokens:</Label>
     </Field>
      <Field id="temp_scale" type="menu" defaultValue="F">

@@ -5,7 +5,7 @@
 		<ConfigUI>
 			<Field id="SupportsStatusRequest"        type="checkbox"  defaultValue="false" hidden="true" />
             <Field id="NumTemperatureInputs"         type="textfield" defaultValue="0"     hidden="true"/>
-            <Field id="NumHumidityInputs"            type="textfield" defaultValue="1"     hidden="true"/>
+            <Field id="NumHumidityInputs"            type="textfield" defaultValue="0"     hidden="true"/>
             <Field id="SupportsHvacFanMode"          type="checkbox"  defaultValue="false" hidden="true"/>
 			<Field id="SupportsHeatSetpoint"         type="checkbox"  defaultValue="false" hidden="true"/>
             <Field id="SupportsCoolSetpoint"         type="checkbox"  defaultValue="false" hidden="true"/>
@@ -42,23 +42,23 @@
 			</State>
 			<State id="fan_modes">
 				<ValueType>String</ValueType>
-				<TriggerLabel>hvac_modes</TriggerLabel>
-				<ControlPageLabel>hvac_modes</ControlPageLabel>
+				<TriggerLabel>fan_modes</TriggerLabel>
+				<ControlPageLabel>fan_modes</ControlPageLabel>
 			</State>
 			<State id="fan_mode">
 				<ValueType>String</ValueType>
-				<TriggerLabel>hvac_mode</TriggerLabel>
-				<ControlPageLabel>hvac_mode</ControlPageLabel>
+				<TriggerLabel>fan_mode</TriggerLabel>
+				<ControlPageLabel>fan_mode</ControlPageLabel>
 			</State>
 			<State id="swing_modes">
 				<ValueType>String</ValueType>
-				<TriggerLabel>hvac_modes</TriggerLabel>
-				<ControlPageLabel>hvac_modes</ControlPageLabel>
+				<TriggerLabel>swing_modes</TriggerLabel>
+				<ControlPageLabel>swing_modes</ControlPageLabel>
 			</State>
 			<State id="swing_mode">
 				<ValueType>String</ValueType>
-				<TriggerLabel>hvac_mode</TriggerLabel>
-				<ControlPageLabel>hvac_mode</ControlPageLabel>
+				<TriggerLabel>swing_mode</TriggerLabel>
+				<ControlPageLabel>swing_mode</ControlPageLabel>
 			</State>
 			<State id="preset_modes">
 				<ValueType>String</ValueType>
@@ -221,7 +221,7 @@
 			<Field id="SupportsStop" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="SupportsOpenTilt" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="SupportsCloseTilt" type="checkbox" hidden="true" defaultValue="false"/>
-			<Field id="SupportsSetTilt" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsSetTiltPosition" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="SupportsStopTilt" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
@@ -289,8 +289,8 @@
 			<Field id="SupportsOff" type="checkbox" hidden="true" defaultValue="true"/>
 			<Field id="SupportsSetSpeed" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="SupportsOscillate" type="checkbox" hidden="true" defaultValue="false"/>
-			<Field id="SupportsDirection" type="checkbox" hidden="true" defaultValue="false"/>
-			<Field id="SupportsPresetMode" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsSetDirection" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsFanPresetMode" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="fan" dynamicReload="true"/>
@@ -309,7 +309,7 @@
 				<ValueType>String</ValueType>
 				<TriggerLabel>lastUpdated</TriggerLabel>
 				<ControlPageLabel>lastUpdated</ControlPageLabel>
-			</State>`````````````````````````````````````````````````````````````````````
+			</State>
 			<State id="actual_state">
 				<ValueType>String</ValueType>
 				<TriggerLabel>Actual State</TriggerLabel>
@@ -322,6 +322,27 @@
 		<Name>Home Assistant Media Player</Name>
 		<ConfigUI>
 			<Field id="SupportsStatusRequest" type="checkbox" defaultValue="false" hidden="true" />
+			<Field id="SupportsOn" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsOff" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsSetVolume" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsVolumeStep" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsVolumeMute" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsPlayMedia" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsPlay" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsPause" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsSeek" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsNextTrack" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsPreviousTrack" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsStop" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsClearPlaylist" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsShuffle" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsSoundMode" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsBrowseMedia" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsRepeat" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsGrouping" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsMediaAnnounce" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsMediaEnqueue" type="checkbox" hidden="true" defaultValue="false"/>
+			<Field id="SupportsSelectSource" type="checkbox" hidden="true" defaultValue="false"/>
 			<Field id="address" type="menu">
                 <Label>Entity:</Label>
                 <List class="self" method="get_entity_list" filter="media_player" dynamicReload="true"/>
