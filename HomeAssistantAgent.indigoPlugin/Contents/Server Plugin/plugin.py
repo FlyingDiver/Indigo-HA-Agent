@@ -297,6 +297,8 @@ class Plugin(indigo.PluginBase):
                 new_props["SupportsWhiteTemperature"] = True
             if any(m in color_modes for m in ['rgbw', 'rgbww', 'white']):
                 new_props["SupportsWhiteLevel"] = True
+            if features & LightEntityFeature.EFFECT:
+                new_props["SupportsEffects"] = True
 
         elif device.deviceTypeId == "HAclimate":
 
@@ -921,6 +923,47 @@ class Plugin(indigo.PluginBase):
                     self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support DimBy")
             else:
                 self.logger.warning(f"{device.name}: actionControlDimmerRelay: {device.address} does not support {action.deviceAction}")
+
+    ########################################
+    # Light Action methods
+    ########################################
+
+    def do_light_action(self, plugin_action, device, _callerWaitingForResult):
+        self.logger.debug(f"{device.name}: do_light_action: {plugin_action.props}")
+        action = plugin_action.props.get("action")
+        action_methods = {
+            "set_effect": self.set_light_effect_action,
+        }
+        method = action_methods.get(action)
+        if method:
+            method(plugin_action, device, _callerWaitingForResult)
+        elif action:
+            self.logger.warning(f"{device.name}: do_light_action: unknown action {action}")
+
+    def set_light_effect_action(self, plugin_action, device, _callerWaitingForResult):
+        effect = plugin_action.props.get("effect")
+        self.logger.debug(f"{device.name}: set_light_effect_action: {effect} for {device.address}")
+        if not device.pluginProps.get("SupportsEffects"):
+            self.logger.warning(f"{device.name}: set_light_effect_action: {device.address} does not support effects")
+            return
+        msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'light',
+                    'service': SERVICE_TURN_ON, 'service_data': {"effect": effect}}
+        self.send_ws(msg_data)
+
+    def light_effect_list(self, _filter, _values_dict, type_id, target_id):
+        self.logger.debug(f"light_effect_list: type_id = {type_id}, target_id = {target_id}")
+        device = indigo.devices[target_id]
+        entity_type, entity_name = device.address.split('.')
+        try:
+            entity = self.ha_entity_map[entity_type][entity_name]
+        except Exception as _err:
+            self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
+            return []
+
+        if entity['attributes'].get('effect_list'):
+            return [(effect, effect) for effect in entity['attributes']['effect_list']]
+        else:
+            return []
 
     ########################################
     # Thermostat Action methods

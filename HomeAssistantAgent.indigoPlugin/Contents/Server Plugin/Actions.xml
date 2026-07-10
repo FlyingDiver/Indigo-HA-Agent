@@ -46,6 +46,22 @@
             </Field>
         </ConfigUI>
     </Action>
+    <Action id="light_actions" deviceFilter="self.HAdimmerType">
+        <Name>Light Actions</Name>
+        <CallbackMethod>do_light_action</CallbackMethod>
+        <ConfigUI>
+			<Field id="action" type="menu" defaultValue="set_effect">
+                <Label>Action:</Label>
+        		<List>
+        			<Option value="set_effect">Light Set Effect</Option>
+        		</List>
+            </Field>
+            <Field id="effect" type="menu" visibleBindingId="action" visibleBindingValue="set_effect">
+                <Label>Light Effect:</Label>
+                 <List class="self" filter="" method="light_effect_list" dynamicReload="true"/>
+            </Field>
+        </ConfigUI>
+    </Action>
     <Action id="cover_actions" deviceFilter="self.ha_cover">
         <Name>Cover Actions</Name>
         <CallbackMethod>do_cover_action</CallbackMethod>
