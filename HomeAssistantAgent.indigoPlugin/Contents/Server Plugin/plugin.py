@@ -287,6 +287,22 @@ class Plugin(indigo.PluginBase):
             self.logger.debug(f"{device.name}: {device.address} not in ha_entity_map[{entity_type}[{entity_name}]")
             return
 
+        # capability pluginProps and states are derived/refreshed by entity_update() itself
+        self.entity_update(entity['entity_id'], entity, force_update=True)
+
+    def _update_device_capabilities(self, device: indigo.Device, entity: dict) -> None:
+        """
+        Derive device capability pluginProps (SupportsX / NumXInputs) from the HA
+        entity's supported_features/supported_color_modes/etc.
+
+        Called from entity_update() on every update (deviceStartComm just calls
+        entity_update once with force_update=True). deviceStartComm alone can't
+        be relied on for this: it runs at plugin startup, before the websocket
+        has necessarily populated ha_entity_map, so its entity lookup can miss
+        and it would otherwise silently skip setting capabilities. Re-deriving
+        them on every entity_update call makes this self-healing regardless of
+        that startup race.
+        """
         new_props = device.pluginProps
         features = entity['attributes'].get('supported_features', 0)
 
@@ -392,8 +408,6 @@ class Plugin(indigo.PluginBase):
 
         if new_props != device.pluginProps:
             device.replacePluginPropsOnServer(new_props)
-        device.stateListOrDisplayStateIdChanged()
-        self.entity_update(entity['entity_id'], entity, force_update=True)  # force update of Indigo device
 
     def deviceStopComm(self, device: indigo.Device) -> None:
         self.logger.info(f"{device.name}: Stopping Agent device for entity '{device.address}'")
@@ -495,6 +509,9 @@ class Plugin(indigo.PluginBase):
             return
 
         device = indigo.devices[device_id]
+
+        self._update_device_capabilities(device, entity)
+        device.stateListOrDisplayStateIdChanged()
 
         if entity["last_updated"] == device.states['lastUpdated'] and not force_update:
             self.logger.threaddebug(f"Device {device.name} already up to date")
