@@ -37,11 +37,6 @@ jobs:
       - name: Check if tag already exists
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
-          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-            echo "::error::Version v$VERSION already exists as a git tag. Please update the PluginVersion in Info.plist."
-            exit 1
-          fi
-          # Also check without 'v' prefix
           if git rev-parse "$VERSION" >/dev/null 2>&1; then
             echo "::error::Version $VERSION already exists as a git tag. Please update the PluginVersion in Info.plist."
             exit 1
