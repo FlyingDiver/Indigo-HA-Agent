@@ -1406,7 +1406,7 @@ class Plugin(indigo.PluginBase):
 
     def media_player_off_action(self, _plugin_action, device, _callerWaitingForResult):
         self.logger.debug(f"{device.name}: media_player_off_action for {device.address}")
-        if not device.pluginProps.get("SupportsOn"):
+        if not device.pluginProps.get("SupportsOff"):
             self.logger.warning(f"{device.name}: media_player_off_action: {device.address} does not support off action")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1496,7 +1496,7 @@ class Plugin(indigo.PluginBase):
     def media_play_set_mode_action(self, plugin_action, device, _callerWaitingForResult):
         mode = plugin_action.props.get("media_mode")
         self.logger.debug(f"{device.name}: media_play_set_mode_action: {mode} for {device.address}")
-        if not device.pluginProps.get("SupportsSelectSource"):
+        if not device.pluginProps.get("SupportsSoundMode"):
             self.logger.warning(f"{device.name}: media_play_set_mode_action: {device.address} does not support select mode")
             return
         msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'media_player',
@@ -1557,14 +1557,18 @@ class Plugin(indigo.PluginBase):
         self.send_ws(msg_data)
 
     def sonos_play_favorite_action(self, plugin_action, device, _callerWaitingForResult):
-        self.logger.debug(f"{device.name}: sonos_play_favorite_action for {device.address}, {plugin_action.props['favorite']}")
+        favorite = plugin_action.props.get("favorite")
+        self.logger.debug(f"{device.name}: sonos_play_favorite_action for {device.address}, {favorite}")
+        if not favorite:
+            self.logger.warning(f"{device.name}: sonos_play_favorite_action: no favorite selected")
+            return
 
         msg_data = {"type": "call_service",
                     'domain': 'media_player',
                     "target": {"entity_id": device.address},
                     'service': SERVICE_PLAY_MEDIA,
                     'service_data': {'media_content_type': 'favorite_item_id',
-                                     'media_content_id': plugin_action.props['favorite']}}
+                                     'media_content_id': favorite}}
 
         self.send_ws(msg_data)
 
@@ -1716,7 +1720,7 @@ class Plugin(indigo.PluginBase):
             self.logger.threaddebug(f"message_handler: {self.message_queue.qsize()} messages in queue")
             msg = self.message_queue.get()
             if not msg:
-                return
+                continue
 
             if type(msg) is not list:
                 self.process_message(msg)
