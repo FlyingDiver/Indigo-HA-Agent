@@ -219,6 +219,12 @@ class Plugin(indigo.PluginBase):
         self.message_queue: Queue = Queue()
         self.battery_entities: dict[int, str] = {}
         self.custom_states: dict[int, list] = {}
+        # Device IDs whose color levels we just set from an incoming HA state
+        # update. indigo.dimmer.setColorLevels() dispatches a SetColorLevels
+        # action back through actionControlDimmerRelay even with
+        # updateStatesOnly=True, so we use this to suppress echoing it back to
+        # HA and creating an update loop.
+        self._suppress_color_action: set[int] = set()
 
     ########################################
 
@@ -729,28 +735,41 @@ class Plugin(indigo.PluginBase):
                     brightness = attributes.get("brightness") or 0
                     device.updateStateOnServer("brightnessLevel", value=round(float(brightness) / 255.0 * 100.0))
 
+                    # redLevel/greenLevel/blueLevel/whiteLevel/whiteTemperature are
+                    # read-only Device properties; they can only be changed via
+                    # indigo.dimmer.setColorLevels(), not device.updateStateOnServer().
+                    color_levels = {}
+
                     color_mode = attributes.get("color_mode")
                     if color_mode in ['rgb', 'hs', 'xy', 'rgbw', 'rgbww'] and attributes.get("rgb_color"):
                         r, g, b = attributes["rgb_color"]
-                        device.updateStateOnServer("redLevel",   value=round(r / 255.0 * 100.0))
-                        device.updateStateOnServer("greenLevel", value=round(g / 255.0 * 100.0))
-                        device.updateStateOnServer("blueLevel",  value=round(b / 255.0 * 100.0))
+                        color_levels["redLevel"] = round(r / 255.0 * 100.0)
+                        color_levels["greenLevel"] = round(g / 255.0 * 100.0)
+                        color_levels["blueLevel"] = round(b / 255.0 * 100.0)
                     elif color_mode == 'hs' and attributes.get("hs_color"):
                         h, s = attributes["hs_color"]
                         r, g, b = colorsys.hsv_to_rgb(h / 360.0, s / 100.0, brightness / 255.0)
-                        device.updateStateOnServer("redLevel",   value=round(r * 100.0))
-                        device.updateStateOnServer("greenLevel", value=round(g * 100.0))
-                        device.updateStateOnServer("blueLevel",  value=round(b * 100.0))
+                        color_levels["redLevel"] = round(r * 100.0)
+                        color_levels["greenLevel"] = round(g * 100.0)
+                        color_levels["blueLevel"] = round(b * 100.0)
                     elif color_mode == 'xy':
                         self.logger.warning(f"{device.name}: xy color mode without rgb_color attribute, cannot convert to RGB")
 
                     if color_mode == 'color_temp' and attributes.get("color_temp"):
-                        device.updateStateOnServer("whiteTemperature", value=round(1000000 / attributes["color_temp"]))
+                        color_levels["whiteTemperature"] = round(1000000 / attributes["color_temp"])
 
                     if color_mode in ['rgbw', 'rgbww'] and attributes.get("rgbw_color"):
-                        device.updateStateOnServer("whiteLevel", value=round(attributes["rgbw_color"][3] / 255.0 * 100.0))
+                        color_levels["whiteLevel"] = round(attributes["rgbw_color"][3] / 255.0 * 100.0)
                     elif color_mode == 'white':
-                        device.updateStateOnServer("whiteLevel", value=round(float(brightness) / 255.0 * 100.0))
+                        color_levels["whiteLevel"] = round(float(brightness) / 255.0 * 100.0)
+
+                    if color_levels:
+                        # indigo.dimmer.setColorLevels() dispatches a SetColorLevels
+                        # action back through actionControlDimmerRelay even with
+                        # updateStatesOnly=True, so guard against echoing this
+                        # HA-originated color back to HA and looping forever.
+                        self._suppress_color_action.add(device.id)
+                        indigo.dimmer.setColorLevels(device, updateStatesOnly=True, **color_levels)
 
             else:
                 self.logger.warning(f"{device.name} device has unknown color mode: {attributes.get('color_mode')}")
@@ -860,6 +879,10 @@ class Plugin(indigo.PluginBase):
                 self.send_ws(msg_data)
 
             elif action.deviceAction == indigo.kDimmerRelayAction.SetColorLevels:
+                if device.id in self._suppress_color_action:
+                    self._suppress_color_action.discard(device.id)
+                    self.logger.debug(f"{device.name}: suppressing echoed SetColorLevels (HA-originated update)")
+                    return
                 msg_data['service'] = SERVICE_TURN_ON
                 color = action.actionValue
                 if 'redLevel' in color:
