@@ -1,2 +1,2 @@
-zeroconf==0.136.0
+zeroconf==0.150.0
 websocket-client==1.7.0

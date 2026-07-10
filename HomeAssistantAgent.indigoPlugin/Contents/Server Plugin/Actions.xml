@@ -4,7 +4,7 @@
         <Name>Climate Actions</Name>
         <CallbackMethod>do_climate_action</CallbackMethod>
         <ConfigUI>
-			<Field id="do_climate_action" type="menu" defaultValue="set_hvac_mode">
+			<Field id="action" type="menu" defaultValue="set_hvac_mode">
                 <Label>Action:</Label>
         		<List>
         			<Option value="set_hvac_mode">Climate Set HVAC Mode</Option>
@@ -18,30 +18,30 @@
         			<Option value="set_temperature">Climate Set Temperature</Option>
         		</List>
             </Field>
-            <Field id="hvac_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_hvac_mode">
+            <Field id="hvac_mode" type="menu" visibleBindingId="action" visibleBindingValue="set_hvac_mode">
                 <Label>HVAC System Mode:</Label>
                  <List class="self" filter="" method="hvac_mode_list" dynamicReload="true"/>
             </Field>
-            <Field id="preset_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_preset_mode">
+            <Field id="preset_mode" type="menu" visibleBindingId="action" visibleBindingValue="set_preset_mode">
                 <Label>Climate Preset Mode:</Label>
                  <List class="self" filter="" method="hvac_preset_mode_list" dynamicReload="true"/>
             </Field>
-            <Field id="fan_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_fan_mode">
+            <Field id="fan_mode" type="menu" visibleBindingId="action" visibleBindingValue="set_fan_mode">
                 <Label>HVAC Fan Mode:</Label>
                  <List class="self" filter="" method="hvac_fan_mode_list" dynamicReload="true"/>
             </Field>
-            <Field id="swing_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_swing_mode">
+            <Field id="swing_mode" type="menu" visibleBindingId="action" visibleBindingValue="set_swing_mode">
                 <Label>Swing Mode:</Label>
                  <List class="self" filter="" method="hvac_swing_mode_list" dynamicReload="true"/>
             </Field>
-            <Field id="horizontal_swing_mode" type="menu" visibleBindingId="climate_action_id" visibleBindingValue="set_horizontal_swing_mode">
-                <Label>Swing Mode:</Label>
-                 <List class="self" filter="" method="hvac_swing_mode_list" dynamicReload="true"/>
+            <Field id="horizontal_swing_mode" type="menu" visibleBindingId="action" visibleBindingValue="set_horizontal_swing_mode">
+                <Label>Horizontal Swing Mode:</Label>
+                 <List class="self" filter="" method="hvac_horizontal_swing_mode_list" dynamicReload="true"/>
             </Field>
-             <Field id="hvac_humidity" type="textfield" default="50"  visibleBindingId="climate_action_id" visibleBindingValue="set_humidity">
+             <Field id="hvac_humidity" type="textfield" default="50"  visibleBindingId="action" visibleBindingValue="set_humidity">
                 <Label>Climate Humidity Setpoint:</Label>
             </Field>
-             <Field id="hvac_temperature" type="textfield" default="72"  visibleBindingId="climate_action_id" visibleBindingValue="set_temperature">
+             <Field id="hvac_temperature" type="textfield" default="72"  visibleBindingId="action" visibleBindingValue="set_temperature">
                 <Label>Climate Temperature Setpoint:</Label>
             </Field>
         </ConfigUI>
@@ -50,7 +50,7 @@
         <Name>Cover Actions</Name>
         <CallbackMethod>do_cover_action</CallbackMethod>
         <ConfigUI>
-			<Field id="cover_action_id" type="menu" defaultValue="open_cover">
+			<Field id="action" type="menu" defaultValue="open_cover">
                 <Label>Action:</Label>
         		<List>
         			<Option value="open_cover">Cover Open</Option>
@@ -63,10 +63,10 @@
         			<Option value="stop_cover_tilt">Stop Cover Tilt Motion</Option>
         		</List>
             </Field>
-            <Field id="cover_position" type="textfield" default="0" visibleBindingId="cover_action_id" visibleBindingValue="set_cover_position">
+            <Field id="cover_position" type="textfield" default="0" visibleBindingId="action" visibleBindingValue="set_cover_position">
                 <Label>Cover Position (%):</Label>
             </Field>
-            <Field id="tilt_position" type="textfield" default="0" visibleBindingId="cover_action_id" visibleBindingValue="set_cover_tilt">
+            <Field id="tilt_position" type="textfield" default="0" visibleBindingId="action" visibleBindingValue="set_cover_tilt_position">
                 <Label>Cover Tilt Position (%):</Label>
             </Field>
         </ConfigUI>
@@ -75,33 +75,33 @@
         <Name>Fan Actions</Name>
         <CallbackMethod>do_fan_action</CallbackMethod>
         <ConfigUI>
-			<Field id="fan_action_id" type="menu" defaultValue="set_fan_speed">
+			<Field id="action" type="menu" defaultValue="turn_on">
                 <Label>Action:</Label>
         		<List>
         			<Option value="set_direction">Fan Set Direction</Option>
         			<Option value="set_preset_mode">Fan Set Preset Mode</Option>
-        			<Option value="set_speed_percentage">Fan Set Speed Percentage</Option>
+        			<Option value="set_percentage">Fan Set Speed Percentage</Option>
         			<Option value="turn_on">Fan On</Option>
         			<Option value="turn_off">Fan Off</Option>
         			<Option value="toggle">Fan Toggle</Option>
         			<Option value="oscillate">Fan Oscillate</Option>
         		</List>
             </Field>
-            <Field id="speed" type="textfield" defaultValue="0" visibleBindingId="fan_action_id" visibleBindingValue="set_fan_speed">
+            <Field id="speed" type="textfield" defaultValue="0" visibleBindingId="action" visibleBindingValue="set_percentage">
                 <Label>Fan Speed (%):</Label>
         	</Field>
-            <Field id="direction" type="menu" defaultValue="Off" visibleBindingId="fan_action_id" visibleBindingValue="set_fan_direction">
+            <Field id="direction" type="menu" defaultValue="Off" visibleBindingId="action" visibleBindingValue="set_direction">
         		<Label>Fan Direction:</Label>
         		<List>
         			<Option value="forward">Forward</Option>
         			<Option value="reverse">Reverse</Option>
         		</List>
         	</Field>
-            <Field id="preset_mode" type="menu" visibleBindingId="fan_action_id" visibleBindingValue="set_fan_preset_mode">
+            <Field id="preset_mode" type="menu" visibleBindingId="action" visibleBindingValue="set_preset_mode">
                 <Label>Fan Preset Mode:</Label>
-                 <List class="self" filter="" method="preset_mode_list" dynamicReload="true"/>
+                 <List class="self" filter="" method="hvac_fan_preset_list" dynamicReload="true"/>
             </Field>
-            <Field id="oscillate" type="menu" defaultValue="Off"  visibleBindingId="fan_action_id" visibleBindingValue="set_fan_oscillate">
+            <Field id="oscillate" type="menu" defaultValue="Off"  visibleBindingId="action" visibleBindingValue="oscillate">
         		<Label>Fan Oscillate:</Label>
         		<List>
         			<Option value="0">Off</Option>
@@ -114,7 +114,7 @@
         <Name>Media Player Actions</Name>
         <CallbackMethod>do_media_player_action</CallbackMethod>
         <ConfigUI>
-			<Field id="media_action_id" type="menu" defaultValue="media_player_on">
+			<Field id="action" type="menu" defaultValue="media_player_on">
                 <Label>Action:</Label>
         		<List>
         			<Option value="media_player_on">Media Player On</Option>
@@ -133,21 +133,21 @@
         			<Option value="sonos_play_favorite">Sonos Play Favorite</Option>
         		</List>
             </Field>
-            <Field id="volume" type="textfield" default="0" visibleBindingId="media_action_id" visibleBindingValue="media_player_set_volume">
+            <Field id="volume" type="textfield" default="0" visibleBindingId="action" visibleBindingValue="media_player_set_volume">
                 <Label>Volume (%):</Label>
             </Field>
-            <Field id="shuffle" type="checkbox" visibleBindingId="media_action_id" visibleBindingValue="media_player_set_shuffle">
+            <Field id="shuffle" type="checkbox" visibleBindingId="action" visibleBindingValue="media_player_set_shuffle">
                 <Label>Shuffle Enabled:</Label>
             </Field>
-            <Field id="media_source" type="menu" visibleBindingId="media_action_id" visibleBindingValue="media_player_set_source">
+            <Field id="media_source" type="menu" visibleBindingId="action" visibleBindingValue="media_player_set_source">
                 <Label>Media Source:</Label>
                  <List class="self" filter="" method="media_player_source_list" dynamicReload="true"/>
             </Field>
-            <Field id="media_mode" type="menu" visibleBindingId="media_action_id" visibleBindingValue="media_player_set_mode">
+            <Field id="media_mode" type="menu" visibleBindingId="action" visibleBindingValue="media_player_set_mode">
                 <Label>Media Mode:</Label>
                  <List class="self" filter="" method="media_player_mode_list" dynamicReload="true"/>
             </Field>
-            <Field id="favorite" type="menu" visibleBindingId="media_action_id" visibleBindingValue="sonos_play_favorite">
+            <Field id="favorite" type="menu" visibleBindingId="action" visibleBindingValue="sonos_play_favorite">
                 <Label>Favorite:</Label>
                  <List class="self" filter="" method="sonos_favorite_list" dynamicReload="true"/>
             </Field>
@@ -257,7 +257,7 @@
     </Action>
     <Action id="set_cover_tilt" deviceFilter="self.ha_cover" uiPath="hidden">
         <Name>Cover Set Tilt</Name>
-        <CallbackMethod>set_cover_tilt_action</CallbackMethod>
+        <CallbackMethod>set_cover_tilt_position_action</CallbackMethod>
         <ConfigUI>
             <Field id="tilt_position" type="textfield" default="0">
                 <Label>Cover Tilt Position (%):</Label>
@@ -295,7 +295,7 @@
         <ConfigUI>
             <Field id="preset_mode" type="menu">
                 <Label>Fan Preset Mode:</Label>
-                 <List class="self" filter="" method="preset_mode_list" dynamicReload="true"/>
+                 <List class="self" filter="" method="hvac_fan_preset_list" dynamicReload="true"/>
             </Field>
         </ConfigUI>
     </Action>
