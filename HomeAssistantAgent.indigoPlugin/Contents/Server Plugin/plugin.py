@@ -11,7 +11,7 @@ import threading
 import websocket
 import ssl
 from enum import IntFlag
-from typing import Any
+from typing import Any, Callable
 from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
 from queue import Queue
 
@@ -934,7 +934,7 @@ class Plugin(indigo.PluginBase):
     def do_light_action(self, plugin_action: indigo.PluginAction, device: indigo.Device, _callerWaitingForResult: bool) -> None:
         self.logger.debug(f"{device.name}: do_light_action: {plugin_action.props}")
         action = plugin_action.props.get("action")
-        action_methods = {
+        action_methods: dict[str, Callable[[indigo.PluginAction, indigo.Device, bool], None]] = {
             "set_effect": self.set_light_effect_action,
         }
         method = action_methods.get(action)
@@ -1419,7 +1419,7 @@ class Plugin(indigo.PluginBase):
     def do_media_player_action(self, plugin_action: indigo.PluginAction, device: indigo.Device, _callerWaitingForResult: bool) -> None:
         self.logger.debug(f"{device.name}: do_media_player_action: {plugin_action.props}")
         action = plugin_action.props.get("action")
-        action_methods = {
+        action_methods: dict[str, Callable[[indigo.PluginAction, indigo.Device, bool], None]] = {
             "media_player_on": self.media_player_on_action,
             "media_player_off": self.media_player_off_action,
             "media_player_set_volume": self.media_player_set_volume_action,
