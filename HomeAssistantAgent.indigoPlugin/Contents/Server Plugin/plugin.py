@@ -84,6 +84,14 @@ class CoverEntityFeature(IntFlag):
     SET_TILT_POSITION = 128
 
 
+class ValveEntityFeature(IntFlag):
+    """Supported features of the valve entity."""
+    OPEN = 1
+    CLOSE = 2
+    STOP = 4
+    SET_POSITION = 8
+
+
 class ClimateEntityFeature(IntFlag):
     """Supported features of the climate entity."""
     TARGET_TEMPERATURE = 1
@@ -186,6 +194,11 @@ SERVICE_SET_COVER_TILT_POSITION = "set_cover_tilt_position"
 SERVICE_STOP_COVER = "stop_cover"
 SERVICE_STOP_COVER_TILT = "stop_cover_tilt"
 SERVICE_TOGGLE_COVER_TILT = "toggle_cover_tilt"
+
+SERVICE_OPEN_VALVE = "open_valve"
+SERVICE_CLOSE_VALVE = "close_valve"
+SERVICE_SET_VALVE_POSITION = "set_valve_position"
+SERVICE_STOP_VALVE = "stop_valve"
 
 
 ################################################################################
@@ -353,6 +366,13 @@ class Plugin(indigo.PluginBase):
             if features & CoverEntityFeature.SET_TILT_POSITION:
                 new_props["SupportsSetTiltPosition"] = True
 
+        elif device.deviceTypeId == "ha_valve":
+
+            if features & ValveEntityFeature.SET_POSITION:
+                new_props["SupportsSetPosition"] = True
+            if features & ValveEntityFeature.STOP:
+                new_props["SupportsStop"] = True
+
         elif device.deviceTypeId == "ha_fan":
 
             if features & FanEntityFeature.SET_SPEED:
@@ -455,7 +475,7 @@ class Plugin(indigo.PluginBase):
 
         retList: list[tuple[str, str]] = []
         for entity_type, entity_list in self.ha_entity_map.items():
-            if filter == "generic" and entity_type in ['binary_sensor', 'climate', 'cover', 'fan', 'light', 'sensor', 'switch', 'lock', 'media_player']:
+            if filter == "generic" and entity_type in ['binary_sensor', 'climate', 'cover', 'fan', 'light', 'sensor', 'switch', 'lock', 'media_player', 'valve']:
                 continue
             retList.append((entity_type, entity_type))
         retList.sort(key=lambda tup: tup[1])
@@ -797,6 +817,18 @@ class Plugin(indigo.PluginBase):
                     device.updateStateOnServer("onOffState", value=True, uiValue=entity["state"].capitalize())
                     device.updateStateImageOnServer(indigo.kStateImageSel.Opened)
 
+        elif device.deviceTypeId == "ha_valve":
+            if entity["last_updated"] != device.states['lastUpdated'] or force_update:
+                device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
+                device.updateStateOnServer("actual_state", value=entity["state"])
+                device.updateStateImageOnServer(indigo.kStateImageSel.NoImage)
+                if entity["state"] == 'closed':
+                    device.updateStateOnServer("onOffState", value=False, uiValue="Closed")
+                    device.updateStateImageOnServer(indigo.kStateImageSel.Closed)
+                else:
+                    device.updateStateOnServer("onOffState", value=True, uiValue=entity["state"].capitalize())
+                    device.updateStateImageOnServer(indigo.kStateImageSel.Opened)
+
         elif device.deviceTypeId == "ha_fan":
             if entity["last_updated"] != device.states['lastUpdated'] or force_update:
                 device.updateStateOnServer("lastUpdated", value=entity["last_updated"])
@@ -909,6 +941,16 @@ class Plugin(indigo.PluginBase):
 
             elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
                 msg_data['service'] = SERVICE_CLOSE_COVER
+                self.send_ws(msg_data)
+
+        if device.deviceTypeId == "ha_valve":
+            msg_data['domain'] = 'valve'
+            if action.deviceAction == indigo.kDeviceAction.TurnOn:
+                msg_data['service'] = SERVICE_OPEN_VALVE
+                self.send_ws(msg_data)
+
+            elif action.deviceAction == indigo.kDimmerRelayAction.TurnOff:
+                msg_data['service'] = SERVICE_CLOSE_VALVE
                 self.send_ws(msg_data)
 
         if device.deviceTypeId == "ha_lock":
