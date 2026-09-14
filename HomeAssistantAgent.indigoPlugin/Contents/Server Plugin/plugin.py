@@ -309,7 +309,8 @@ class Plugin(indigo.PluginBase):
         # capability pluginProps and states are derived/refreshed by entity_update() itself
         self.entity_update(entity['entity_id'], entity, force_update=True)
 
-    def _update_device_capabilities(self, device: indigo.Device, entity: dict) -> None:
+    @staticmethod
+    def _update_device_capabilities(device: indigo.Device, entity: dict) -> None:
         """
         Derive device capability pluginProps (SupportsX / NumXInputs) from the HA
         entity's supported_features/supported_color_modes/etc.
