@@ -565,6 +565,17 @@ class Plugin(indigo.PluginBase):
             else:
                 update_list.append({'key': key, 'value': json.dumps(attributes[key])})
 
+        # Stabilize media_player optional states. Home Assistant drops `source`
+        # from a media_player when it is off/idle; because the state list is
+        # rebuilt purely from `attributes`, that key then vanishes and any
+        # control-page tile bound to it logs "state key source not defined" on
+        # every repaint. Seed a stable default so a source-capable player always
+        # keeps `source`. (source_list is present even when off = source-capable.)
+        if device.deviceTypeId == "ha_media_player":
+            if ("source_list" in attributes) and ("source" not in new_states_list):
+                new_states_list.append("source")
+                update_list.append({'key': "source", 'value': ""})
+
         # Update battery state if needed
         if device.id in self.battery_entities:
             battery_entity_id = self.battery_entities.get(device.id)
@@ -1098,9 +1109,24 @@ class Plugin(indigo.PluginBase):
     def _handleChangeSetpointAction(self, device: indigo.Device, newSetpoint: float, stateKey: str) -> None:
         if stateKey in ["setpointCool", "setpointHeat"]:
             self.logger.debug(f"{device.name}: actionControlThermostat _handleChangeSetpointAction: {stateKey} {newSetpoint:.1f}")
+            # A heat_cool (auto) climate entity takes the target_temp_low/high PAIR, not a
+            # single 'temperature' (HA rejects/misapplies the single value on dual-setpoint
+            # devices). Send both, changing only the requested setpoint and preserving the other.
+            if device.hvacMode in (indigo.kHvacMode.HeatCool, indigo.kHvacMode.ProgramHeatCool):
+                cool = newSetpoint if stateKey == "setpointCool" else device.coolSetpoint
+                heat = newSetpoint if stateKey == "setpointHeat" else device.heatSetpoint
+                service_data = {"target_temp_high": cool, "target_temp_low": heat}
+            else:
+                service_data = {"temperature": newSetpoint}
             msg_data = {"type": "call_service", "target": {"entity_id": device.address}, 'domain': 'climate', 'service': 'set_temperature',
-                        'service_data': {"temperature": newSetpoint}}
+                        'service_data': service_data}
             self.send_ws(msg_data)
+            # Optimistic local echo: cloud backends (e.g. Trane/Nexia) can take many seconds
+            # to report the new setpoint back, during which Indigo's relative +/- actions
+            # recompute from a stale base (taps don't accumulate) and the UI looks frozen.
+            # Reflect the commanded value now; the next HA entity_update reconciles it (and
+            # corrects if HA clamps to its minimum deadband).
+            device.updateStateOnServer(stateKey, newSetpoint)
 
     ########################################
     # Speed Control Action callbacks
