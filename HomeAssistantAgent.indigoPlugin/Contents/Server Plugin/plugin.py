@@ -341,15 +341,22 @@ class Plugin(indigo.PluginBase):
 
         elif device.deviceTypeId == "HAclimate":
 
-            if features & ClimateEntityFeature.TARGET_TEMPERATURE:
+            # NumXInputs controls whether Indigo creates the temperatureInput1 /
+            # humidityInput1 states, which entity_update() writes from the
+            # current_* attributes. Gate on the presence of those attributes
+            # (sensing), not just the TARGET_* features (control) - many
+            # thermostats report humidity without being able to set it.
+            attributes = entity['attributes']
+            if 'current_temperature' in attributes or features & ClimateEntityFeature.TARGET_TEMPERATURE:
                 new_props["NumTemperatureInputs"] = 1
-            if features & ClimateEntityFeature.TARGET_HUMIDITY:
+            if 'current_humidity' in attributes or features & ClimateEntityFeature.TARGET_HUMIDITY:
                 new_props["NumHumidityInputs"] = 1
             if features & ClimateEntityFeature.FAN_MODE:
                 new_props["SupportsHvacFanMode"] = True
-            if 'heat' in entity['attributes']['hvac_modes']:
+            hvac_modes = attributes.get('hvac_modes') or []
+            if 'heat' in hvac_modes:
                 new_props["SupportsHeatSetpoint"] = True
-            if 'cool' in entity['attributes']['hvac_modes']:
+            if 'cool' in hvac_modes:
                 new_props["SupportsCoolSetpoint"] = True
 
         elif device.deviceTypeId == "ha_cover":
@@ -616,15 +623,16 @@ class Plugin(indigo.PluginBase):
 
                 # HA setpoints are wonky
 
+                hvac_modes = attributes.get('hvac_modes') or []
                 if attributes.get("temperature") is not None:
-                    if 'heat' in attributes['hvac_modes']:
+                    if 'heat' in hvac_modes:
                         update_list.append({'key': "setpointHeat", 'value': attributes["temperature"]})
-                    if 'cool' in attributes['hvac_modes']:
+                    if 'cool' in hvac_modes:
                         update_list.append({'key': "setpointCool", 'value': attributes["temperature"]})
                 elif attributes.get('target_temp_high') is not None and attributes.get('target_temp_low') is not None:
-                    if 'heat' in attributes['hvac_modes']:
+                    if 'heat' in hvac_modes:
                         update_list.append({'key': "setpointHeat", 'value': attributes["target_temp_low"]})
-                    if 'cool' in attributes['hvac_modes']:
+                    if 'cool' in hvac_modes:
                         update_list.append({'key': "setpointCool", 'value': attributes["target_temp_high"]})
 
                 if attributes.get("preset_mode"):
