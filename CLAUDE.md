@@ -100,7 +100,7 @@ Two trigger types defined in `Events.xml`:
 
 Releases are automated via GitHub Actions:
 1. Update `PluginVersion` in `HomeAssistantAgent.indigoPlugin/Contents/Info.plist`.
-2. Push to `main` or `master`. The workflow creates a GitHub release tagged `v<version>` and attaches a `.indigoPlugin.zip`.
+2. Push to `main` or `master`. The workflow creates the tag and a GitHub release named with the bare version (e.g. `2026.1.2`, no `v` prefix) and attaches a `.indigoPlugin.zip`. Don't tag manually — a hand-made tag duplicates the one the workflow creates.
 3. PRs to `main`/`master` are blocked if the version tag already exists (enforced by `version-check.yml`).
 
 The zip excludes `.pyc`, `__pycache__`, `.idea`, and `Contents/Packages/` (vendored deps are not distributed).
